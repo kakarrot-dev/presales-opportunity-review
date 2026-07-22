@@ -23,12 +23,65 @@ REQUIRED_FILES = (
     "examples/sample-report.md",
 )
 
+MATERIAL_RECORD_TOKENS = (
+    "id",
+    "path",
+    "format",
+    "content_regions",
+    "status",
+    "parse_confidence",
+    "provenance",
+    "errors",
+)
+
+COMPANY_PROFILE_HEADINGS = (
+    "## 元数据",
+    "## 公司定位",
+    "## 产品能力",
+    "## 技术能力",
+    "## 交付能力",
+    "## 商务原则",
+    "## 能力边界",
+    "## L0-L3 判定基线",
+    "## 历史案例",
+    "## 工作量参考",
+    "## 报价参考",
+)
+
+
+def require_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [f"{label} missing token: {token}" for token in tokens if token not in text]
+
+
+def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
+
 
 def validate_package(root: Path) -> list[str]:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
         if not (root / relative_path).is_file():
             errors.append(f"missing: {relative_path}")
+    errors.extend(
+        require_tokens(
+            root / "references" / "material-classification.md",
+            "material rules",
+            MATERIAL_RECORD_TOKENS,
+        )
+    )
+    errors.extend(
+        require_headings(
+            root / "knowledge" / "company-profile.md",
+            "company profile",
+            COMPANY_PROFILE_HEADINGS,
+        )
+    )
     return errors
 
 

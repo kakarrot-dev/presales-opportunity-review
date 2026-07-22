@@ -19,3 +19,18 @@ class SkillPackageTests(unittest.TestCase):
 
             self.assertIn("missing: knowledge/company-profile.md", errors)
             self.assertIn("missing: references/material-classification.md", errors)
+
+    def test_material_rules_and_company_profile_have_required_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            material = root / "references" / "material-classification.md"
+            profile = root / "knowledge" / "company-profile.md"
+            material.parent.mkdir(parents=True)
+            profile.parent.mkdir(parents=True)
+            material.write_text("# Material classification\n", encoding="utf-8")
+            profile.write_text("# Company profile\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("material rules missing token: parse_confidence", errors)
+            self.assertIn("company profile missing heading: ## 能力边界", errors)

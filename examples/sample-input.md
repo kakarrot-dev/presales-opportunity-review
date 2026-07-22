@@ -29,3 +29,22 @@
 
 - “示例行业媒体乙”也称该项目已经启动，并明示改写自同一一手来源“虚构采购方新闻稿”。
 - M003 与 M004 因此只能计为一个独立来源。样例不提供任何网址，不允许将文章摘要升级为已交叉验证。
+
+## 材料 M005：虚构技术需求书.docx
+
+- “3.2 接口要求”标题下的正文提出对接要求，不在表格内；定位必须保留 `path`、`heading`，并将不适用的 `table_row` 明确写为 `null`。
+
+## 材料 M006：虚构评分办法.pdf
+
+- 第 6 页“表 2 资格要求”包含原厂授权条款；定位必须保留 `path`、`page` 和页面内 `region`，不得使用降级文本的行号冒充 PDF 页码。
+
+## 材料 M007：虚构授权要求扫描件.png
+
+- 图片第一页包含授权要求；OCR 定位必须保留 `path`、`page`、`bbox` 和 `ocr_confidence`。
+
+## 结构化定位约束
+
+- XLSX 提取事实使用 `path/sheet/cell_or_range`。
+- DOCX 提取事实使用 `path/heading/table_row`。
+- PDF 提取事实使用 `path/page/region`。
+- 图片或 OCR 提取事实使用 `path/page/bbox/ocr_confidence`。

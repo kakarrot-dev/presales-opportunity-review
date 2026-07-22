@@ -31,7 +31,7 @@ description: Analyze heterogeneous tender and opportunity materials for presales
 
 1. **阶段 01：接收用户材料**：接收文件、附件和用户补充说明，确认分析目标、截止时间、输出路径和用户明示的限制；不替用户作出报价或承诺授权。
 2. **阶段 02：枚举并识别有效内容**：按 `references/material-classification.md` 逐文件、附件、工作表、页面和内容区域建立记录，保留空白页/表、原始数量文本、采购约束和降级错误，生成 `00-material-index.md`。
-3. **阶段 03：读取公司能力基线**：在任何能力分析、工作量、报价或参与建议前，读取 `knowledge/company-profile.md`，记录更新时间、可信度、缺失和过期状态。
+3. **阶段 03：读取公司能力基线**：在任何能力分析、工作量、报价或参与建议前，读取 `knowledge/company-profile.md`，逐条核对稳定条目 ID、更新时间、复核期限、状态、可信度、负责人、证据、适用范围、缺失和过期状态。
 4. **阶段 04：建立项目画像**：按 `references/project-profiling.md` 建立 `project-analysis.yaml`，只归一化材料直接支持的事实，保留缺失、冲突、解析失败和置信度。
 5. **阶段 05：识别采购机制**：按 `references/procurement-mechanism.md` 识别采购类型、资金模式、报价方向、轮次、评审和授标约束，不默认低价中标。
 6. **阶段 06：检查条款优先级与冲突**：按采购规则优先级比对版本与条款，将无法裁决的原始矛盾同时写入 `materials.conflicts` 和 `procurement.rule_conflicts`。
@@ -39,7 +39,7 @@ description: Analyze heterogeneous tender and opportunity materials for presales
 8. **阶段 08：默认执行外部调查**：除非用户明示禁止，默认执行外部调查。按 `references/research-rules.md` 拆分原子主张并打开原始来源，再按 `references/evidence-rules.md` 建立证据记录；不直接引用搜索摘要。
 9. **阶段 09：拆分标段/采购包/需求项**：按 `references/requirement-analysis.md` 先拆标段与采购包，再按交付物、验收、依赖和责任边界形成可追溯的原子需求。
 10. **阶段 10：分析资格及响应合规**：按 `references/evaluation-analysis.md` 识别硬性资格、原厂证明、响应性、可补正性和废标风险，不把未知写成已满足。
-11. **阶段 11：逐条能力匹配**：仅在阶段 03 完成后，按 `references/capability-matching.md` 对每条原子需求给出 L0-L3 或待内部确认，并引用公司基线。
+11. **阶段 11：逐条能力匹配**：仅在阶段 03 完成后，按 `references/capability-matching.md` 对每条原子需求给出 L0-L3 或待内部确认，并引用一个或多个当前有效的公司基线条目 ID；缺失、无 ID 或过期引用一律降级为待内部确认。
 12. **阶段 12：隐藏工作量和风险**：按 `references/requirement-analysis.md` 逐项检查数据、接口、部署、迁移、定制、测试、培训、现场服务、质保和验收，记录触发条件、影响与缓解动作。
 13. **阶段 13：竞品和厂商生态**：只基于采购材料或已核验证据识别直接竞品、替代方案、原厂和潜在合作方，记录授权、合作边界和失效影响。
 14. **阶段 14：评审与成交路径**：按 `references/evaluation-analysis.md` 选择文件实际规定的评审、排序、谈判和授标路径；没有明确分值时不估算得分。

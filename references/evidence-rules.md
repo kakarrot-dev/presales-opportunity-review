@@ -28,3 +28,5 @@ evidence:
 `independent_sources` 只列彼此独立的来源；转引、转载或共同源自同一公告的材料只记录一次。`contradictions` 保留不一致的主张、来源和差异，不能删除较弱的一方来制造一致性。`confidence` 反映证据质量和完整性，不替代 `verification_status`。
 
 单一来源待验证、来源冲突和无法验证不能作为正式报告的确定性事实；它们只能驱动澄清、风险提示或后续核验。只有已由一手来源确认或已交叉验证的记录，才可在符合时效性和适用范围前提下作为正式结论的事实依据。
+
+来自用户材料的证据必须在 `location` 写入可解析的 `source_fact_id`，并回到 `project-analysis.yaml` 的 `materials.source_facts[].provenance` 获取格式化精确定位。不得把自由文本行号写入 PDF 的 `page`，也不得用 OCR 降级文本替换原始 PDF 的 `path/page/region`。

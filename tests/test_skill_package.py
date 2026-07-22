@@ -22,6 +22,7 @@ materials:
   parse_failures: []
   conflicts: []
   confidence: null
+  source_facts: []
 procurement:
   lots: []
   joint_bid_policy: null
@@ -97,6 +98,57 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_checker_rejects_wrong_format_provenance_fields(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace('"source_format": "pdf"', '"source_format": "xlsx"', 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report provenance invalid fields: F003/xlsx", errors)
+
+    def test_checker_rejects_missing_format_specific_locator(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace('"region": "表 2 资格要求", ', "", 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report provenance invalid fields: F003/pdf", errors)
+
+    def test_checker_rejects_text_line_disguised_as_pdf_page_region(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace('"region": "表 2 资格要求"', '"region": "text line 42"', 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn(
+                "sample report PDF provenance cannot use text-line locator: F003",
+                errors,
+            )
+
     def test_checker_rejects_invalid_sample_material_format(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
@@ -178,6 +230,44 @@ class SkillPackageTests(unittest.TestCase):
             errors = validate_package(root)
 
             self.assertIn("SKILL.md invalid approved 19-stage workflow", errors)
+
+    def test_checker_rejects_malformed_skill_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "SKILL.md").write_text(
+                "---\nname: presales-opportunity-review\ndescription: Review.\n",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md invalid YAML frontmatter", errors)
+
+    def test_checker_rejects_duplicate_skill_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "SKILL.md").write_text(
+                "---\nname: presales-opportunity-review\ndescription: Review.\n---\n"
+                "# Skill\n---\nname: duplicate\ndescription: Duplicate.\n---\n",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md duplicate YAML frontmatter", errors)
+
+    def test_checker_requires_exact_skill_name_and_nonempty_description(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "SKILL.md").write_text(
+                "---\nname: another-skill\ndescription: \n---\n",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md invalid frontmatter name: another-skill", errors)
+            self.assertIn("SKILL.md frontmatter description must be nonempty", errors)
 
     def test_checker_rejects_baseline_failure_without_current_fallback_and_isolated_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -607,6 +697,73 @@ strategy.recommendation: Conditional Go
                 errors,
             )
 
+    def test_company_profile_rejects_missing_stable_entry_field(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "knowledge" / "company-profile.md"
+            profile.parent.mkdir(parents=True)
+            source = (source_root / "knowledge" / "company-profile.md").read_text(
+                encoding="utf-8"
+            )
+            profile.write_text(
+                source.replace("  review_due: null\n", "", 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("company profile entry schema missing field: review_due", errors)
+
+    def test_capability_rules_require_entry_id_citation_and_expiry_fallback(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capability = root / "references" / "capability-matching.md"
+            capability.parent.mkdir(parents=True)
+            source = (source_root / "references" / "capability-matching.md").read_text(
+                encoding="utf-8"
+            )
+            capability.write_text(
+                source.replace(
+                    "每个 `company_match` 必须引用一个或多个 `company_profile_entry_ids`。",
+                    "每个 `company_match` 应参考公司资料。",
+                    1,
+                ).replace(
+                    "分析日期晚于任一条目的 `review_due` 时，该引用过期并降级为 `待内部确认`。",
+                    "条目过期时提醒复核。",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("capability rules missing company profile entry ID citation", errors)
+            self.assertIn("capability rules missing expired entry fallback", errors)
+
+    def test_capability_rules_reject_missing_entry_id_without_internal_confirmation(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capability = root / "references" / "capability-matching.md"
+            capability.parent.mkdir(parents=True)
+            source = (source_root / "references" / "capability-matching.md").read_text(
+                encoding="utf-8"
+            )
+            capability.write_text(
+                source.replace(
+                    "`company_profile_entry_ids` 缺失、为空、引用不存在的 `id`，或条目 `status` 不是 `verified` 时，结论降级为 `待内部确认`。",
+                    "缺少引用时继续人工判断。",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("capability rules missing absent entry ID fallback", errors)
+
     def test_project_and_procurement_rules_define_routing_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -652,6 +809,24 @@ strategy.recommendation: Conditional Go
 
             self.assertIn("project schema missing path: strategy.pricing", errors)
             self.assertIn("project schema unexpected path: pricing", errors)
+
+    def test_project_schema_rejects_duplicate_yaml_key(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profiling = root / "references" / "project-profiling.md"
+            profiling.parent.mkdir(parents=True)
+            profiling.write_text(
+                PROJECT_SCHEMA.replace(
+                    "  pricing: null\n",
+                    "  pricing: null\n  pricing: null\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("project schema duplicate path: strategy.pricing", errors)
 
     def test_procurement_precedence_rejects_swapped_levels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

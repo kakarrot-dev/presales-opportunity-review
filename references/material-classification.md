@@ -14,6 +14,18 @@ material:
   errors: []
 ```
 
+`provenance` 不是自由文本。每条提取事实必须保存一个与 `format` 一致的结构化定位对象，并分配稳定的 `source_fact_id`：
+
+```yaml
+xlsx: {path: null, sheet: null, cell_or_range: null}
+docx: {path: null, heading: null, table_row: null}
+pdf: {path: null, page: null, region: null}
+image: {path: null, page: null, bbox: null, ocr_confidence: null}
+markdown: {path: null, heading: null, line_or_range: null}
+```
+
+字段必须按源格式精确匹配，不得把 Excel 行号写成 PDF 页码，也不得让降级文本的 `line` 或 `line_or_range` 冒充 PDF 的 `page`/`region`。DOCX 中不适用的 `heading` 或 `table_row` 仍须显式写为 `null`。扫描 PDF 仍使用 `pdf` 的 `path/page/region`，另行关联 OCR 结果；独立图片或图片 OCR 使用 `image` 的 `path/page/bbox/ocr_confidence`。每条提取事实的 `statement`、`source_format` 与 `provenance` 一起写入 `project-analysis.yaml` 的 `materials.source_facts`。
+
 ## 分类与提取规则
 
 1. 枚举每个文件、工作表、页面、附件和识别出的区域；空白工作表必须单独标记，不得默认为无效材料。

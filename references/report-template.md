@@ -127,6 +127,8 @@
 - `contradictions`
 - `confidence`
 
+来自用户材料的证据在 `location` 保存 `source_fact_id`，并回溯 `project-analysis.yaml` 的 `materials.source_facts[].provenance`。XLSX、DOCX、PDF 与图片/OCR 分别保持自己的定位字段，不得将自由文本行号伪装为 PDF 页码。
+
 ### verification_status
 
 - 已由一手来源确认

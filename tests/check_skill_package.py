@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import re
 from pathlib import Path
@@ -33,6 +34,12 @@ MATERIAL_RECORD_TOKENS = (
     "parse_confidence",
     "provenance",
     "errors",
+    "source_fact_id",
+    "cell_or_range",
+    "table_row",
+    "region",
+    "bbox",
+    "ocr_confidence",
 )
 
 PROJECT_PROFILING_TOKENS = (
@@ -45,6 +52,9 @@ PROJECT_PROFILING_TOKENS = (
     "bid",
     "strategy",
     "evidence",
+    "source_facts",
+    "source_fact_id",
+    "provenance",
 )
 
 PROJECT_SCHEMA_PATHS = (
@@ -53,7 +63,7 @@ PROJECT_SCHEMA_PATHS = (
     "project.funding_model", "project.current_stage", "project.budget",
     "project.delivery_scope", "project.timeline",
     "materials", "materials.provided", "materials.missing", "materials.parse_failures",
-    "materials.conflicts", "materials.confidence",
+    "materials.conflicts", "materials.confidence", "materials.source_facts",
     "procurement", "procurement.lots", "procurement.joint_bid_policy",
     "procurement.subcontract_policy", "procurement.pricing_direction",
     "procurement.quotation_rounds", "procurement.evaluation_method",
@@ -109,6 +119,14 @@ COMPANY_PROFILE_GUARDRAIL_TOKENS = (
     "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
 )
 
+COMPANY_PROFILE_ENTRY_FIELDS = (
+    "id", "statement", "scope", "evidence", "updated_at", "owner", "confidence", "status", "review_due",
+)
+COMPANY_PROFILE_SCHEMA_PATHS = (
+    "company_profile", "company_profile.entries", "company_profile_entry",
+    *(f"company_profile_entry.{field}" for field in COMPANY_PROFILE_ENTRY_FIELDS),
+)
+
 RESEARCH_RULE_TOKENS = (
     "搜索结果摘要不能直接作为事实依据",
     "原子主张",
@@ -131,6 +149,8 @@ EVIDENCE_RULE_TOKENS = (
 
 REQUIREMENT_ANALYSIS_TOKENS = (
     "原始要求和出处",
+    "source_fact_id",
+    "provenance",
     "交付物",
     "依赖",
     "验收",
@@ -431,6 +451,10 @@ SAMPLE_INPUT_TOKENS = (
     "最高报价",
     "原厂授权",
     "同一一手来源",
+    "cell_or_range",
+    "table_row",
+    "region",
+    "ocr_confidence",
 )
 
 SAMPLE_REPORT_TOKENS = (
@@ -447,10 +471,21 @@ SAMPLE_REPORT_TOKENS = (
     "仅限内部的报价假设",
     "正式报告摘录",
     "| 公司基线 | FAIL |",
+    "结构化来源事实",
 )
 
 MATERIAL_FORMATS = ("xlsx", "docx", "pdf", "markdown", "image", "other")
 FORMAL_EVIDENCE_STATUSES = ("已由一手来源确认", "已交叉验证")
+
+SOURCE_FACT_FIELDS = {"id", "statement", "source_format", "provenance"}
+PROVENANCE_FIELDS = {
+    "xlsx": {"path", "sheet", "cell_or_range"},
+    "docx": {"path", "heading", "table_row"},
+    "pdf": {"path", "page", "region"},
+    "image": {"path", "page", "bbox", "ocr_confidence"},
+    "markdown": {"path", "heading", "line_or_range"},
+}
+REQUIRED_SAMPLE_SOURCE_FORMATS = {"xlsx", "docx", "pdf", "image"}
 
 FORMAL_EVIDENCE_GATE_RULE = (
     "只有 `已由一手来源确认` 或 `已交叉验证` 能支持正式报告中的确定性事实；"
@@ -470,6 +505,36 @@ YAML_MAPPING_LINE = re.compile(
     r"^(?P<indent>[ ]*)(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?P<value>.*)$"
 )
 FLOW_MAPPING_KEY = re.compile(r"(?:^|,)\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:")
+
+
+def require_skill_frontmatter(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    delimiters = [index for index, line in enumerate(lines) if line.strip() == "---"]
+    if not lines or lines[0].strip() != "---" or len(delimiters) < 2:
+        return ["SKILL.md invalid YAML frontmatter"]
+    if len(delimiters) > 2:
+        return ["SKILL.md duplicate YAML frontmatter"]
+
+    closing = delimiters[1]
+    fields: dict[str, str] = {}
+    for line in lines[1:closing]:
+        if ":" not in line:
+            return ["SKILL.md invalid YAML frontmatter"]
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if not key or key in fields:
+            return ["SKILL.md invalid YAML frontmatter"]
+        fields[key] = value.strip().strip("\"'")
+
+    errors: list[str] = []
+    name = fields.get("name", "")
+    if name != "presales-opportunity-review":
+        errors.append(f"SKILL.md invalid frontmatter name: {name or '<missing>'}")
+    if not fields.get("description", "").strip():
+        errors.append("SKILL.md frontmatter description must be nonempty")
+    return errors
 
 
 def require_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
@@ -621,6 +686,18 @@ def require_capability_definitions(path: Path) -> list[str]:
     )
     if any(relationship not in text for relationship in required_relationships):
         errors.append("capability rules missing evidence fallback relationship")
+    if "每个 `company_match` 必须引用一个或多个 `company_profile_entry_ids`。" not in text:
+        errors.append("capability rules missing company profile entry ID citation")
+    if (
+        "`company_profile_entry_ids` 缺失、为空、引用不存在的 `id`，或条目 `status` 不是 `verified` 时，结论降级为 `待内部确认`。"
+        not in text
+    ):
+        errors.append("capability rules missing absent entry ID fallback")
+    if (
+        "分析日期晚于任一条目的 `review_due` 时，该引用过期并降级为 `待内部确认`。"
+        not in text
+    ):
+        errors.append("capability rules missing expired entry fallback")
     return errors
 
 
@@ -687,6 +764,128 @@ def require_project_schema(path: Path) -> list[str]:
     errors.extend(
         f"project schema unexpected path: {schema_path}"
         for schema_path in sorted(actual_paths - expected_paths)
+    )
+    errors.extend(
+        f"project schema duplicate path: {schema_path}"
+        for schema_path, count in sorted(actual_path_counts.items())
+        if count > 1
+    )
+    return errors
+
+
+def require_company_profile_contract(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    actual_path_counts = yaml_mapping_paths(path)
+    if actual_path_counts is None:
+        return ["company profile missing entry schema YAML fenced block"]
+    actual_paths = set(actual_path_counts)
+    expected_paths = set(COMPANY_PROFILE_SCHEMA_PATHS)
+    errors = [
+        f"company profile entry schema missing field: {schema_path.removeprefix('company_profile_entry.')}"
+        for schema_path in sorted(expected_paths - actual_paths)
+        if schema_path.startswith("company_profile_entry.")
+    ]
+    errors.extend(
+        f"company profile entry schema unexpected path: {schema_path}"
+        for schema_path in sorted(actual_paths - expected_paths)
+    )
+    errors.extend(
+        f"company profile entry schema duplicate path: {schema_path}"
+        for schema_path, count in sorted(actual_path_counts.items())
+        if count > 1
+    )
+    return errors
+
+
+def sample_source_facts(path: Path) -> tuple[list[dict[str, object]] | None, list[str]]:
+    if not path.is_file():
+        return None, []
+    section = markdown_section(path.read_text(encoding="utf-8"), "## 结构化来源事实")
+    match = re.search(r"```json\s*\n(?P<body>.*?)```", section, re.DOTALL)
+    if match is None:
+        return None, ["sample report missing structured source facts JSON block"]
+    try:
+        payload = json.loads(match.group("body"))
+    except json.JSONDecodeError:
+        return None, ["sample report invalid structured source facts JSON"]
+    if not isinstance(payload, dict) or not isinstance(payload.get("source_facts"), list):
+        return None, ["sample report invalid structured source facts root"]
+    return payload["source_facts"], []
+
+
+def require_sample_source_facts(path: Path) -> list[str]:
+    records, errors = sample_source_facts(path)
+    if records is None:
+        return errors
+
+    seen_ids: set[str] = set()
+    seen_formats: set[str] = set()
+    for raw_record in records:
+        if not isinstance(raw_record, dict):
+            errors.append("sample report invalid structured source fact record")
+            continue
+        fact_id = str(raw_record.get("id", "<missing>"))
+        if set(raw_record) != SOURCE_FACT_FIELDS:
+            errors.append(f"sample report source fact invalid fields: {fact_id}")
+        if fact_id in seen_ids:
+            errors.append(f"sample report duplicate source fact id: {fact_id}")
+        seen_ids.add(fact_id)
+
+        source_format = raw_record.get("source_format")
+        if not isinstance(source_format, str) or source_format not in PROVENANCE_FIELDS:
+            errors.append(f"sample report unsupported provenance format: {fact_id}/{source_format}")
+            continue
+        seen_formats.add(source_format)
+        provenance = raw_record.get("provenance")
+        if not isinstance(provenance, dict) or set(provenance) != PROVENANCE_FIELDS[source_format]:
+            errors.append(f"sample report provenance invalid fields: {fact_id}/{source_format}")
+            continue
+        if not isinstance(provenance.get("path"), str) or not provenance["path"].strip():
+            errors.append(f"sample report provenance missing path: {fact_id}")
+        if source_format == "xlsx" and any(
+            not isinstance(provenance.get(field), str) or not provenance[field].strip()
+            for field in ("sheet", "cell_or_range")
+        ):
+            errors.append(f"sample report xlsx provenance missing locator: {fact_id}")
+        elif source_format == "docx":
+            if provenance.get("heading") is not None and not isinstance(provenance.get("heading"), str):
+                errors.append(f"sample report docx provenance invalid heading: {fact_id}")
+            if provenance.get("table_row") is not None and not isinstance(
+                provenance.get("table_row"), (int, str)
+            ):
+                errors.append(f"sample report docx provenance invalid table_row: {fact_id}")
+        elif source_format == "pdf":
+            if not isinstance(provenance.get("page"), int) or provenance["page"] < 1:
+                errors.append(f"sample report PDF provenance invalid page: {fact_id}")
+            region = provenance.get("region")
+            if not isinstance(region, str) or not region.strip():
+                errors.append(f"sample report PDF provenance missing region: {fact_id}")
+            elif re.search(r"(?:text\s*line|line\s*\d+|第\s*\d+\s*行)", region, re.IGNORECASE):
+                errors.append(
+                    f"sample report PDF provenance cannot use text-line locator: {fact_id}"
+                )
+        elif source_format == "image":
+            bbox = provenance.get("bbox")
+            confidence = provenance.get("ocr_confidence")
+            if not isinstance(provenance.get("page"), int) or provenance["page"] < 1:
+                errors.append(f"sample report image provenance invalid page: {fact_id}")
+            if not isinstance(bbox, list) or len(bbox) != 4 or not all(
+                isinstance(value, (int, float)) for value in bbox
+            ):
+                errors.append(f"sample report image provenance invalid bbox: {fact_id}")
+            if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+                errors.append(f"sample report image provenance invalid OCR confidence: {fact_id}")
+        elif source_format == "markdown" and any(
+            not isinstance(provenance.get(field), str) or not provenance[field].strip()
+            for field in ("heading", "line_or_range")
+        ):
+            errors.append(f"sample report markdown provenance missing locator: {fact_id}")
+
+    missing_formats = REQUIRED_SAMPLE_SOURCE_FORMATS - seen_formats
+    errors.extend(
+        f"sample report missing provenance format example: {source_format}"
+        for source_format in sorted(missing_formats)
     )
     return errors
 
@@ -911,6 +1110,7 @@ def require_example_contract(root: Path) -> list[str]:
         for forbidden in ("内部底价", "仅限内部的报价假设"):
             if forbidden in formal_excerpt:
                 errors.append(f"sample formal excerpt contains internal assumption: {forbidden}")
+    errors.extend(require_sample_source_facts(report_path))
     errors.extend(require_sample_report_semantics(report_path))
     return errors
 
@@ -920,6 +1120,7 @@ def validate_package(root: Path) -> list[str]:
     for relative_path in REQUIRED_FILES:
         if not (root / relative_path).is_file():
             errors.append(f"missing: {relative_path}")
+    errors.extend(require_skill_frontmatter(root / "SKILL.md"))
     errors.extend(require_tokens(root / "SKILL.md", "SKILL.md", SKILL_REQUIRED_TOKENS))
     errors.extend(require_skill_orchestration(root / "SKILL.md"))
     errors.extend(require_tokens(root / "SKILL.md", "SKILL.md degradation", SKILL_DEGRADATION_TOKENS))
@@ -945,6 +1146,7 @@ def validate_package(root: Path) -> list[str]:
             COMPANY_PROFILE_GUARDRAIL_TOKENS,
         )
     )
+    errors.extend(require_company_profile_contract(root / "knowledge" / "company-profile.md"))
     errors.extend(
         require_tokens(
             root / "references" / "project-profiling.md",

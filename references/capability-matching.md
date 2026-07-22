@@ -2,7 +2,9 @@
 
 ## 判定前提
 
-每一项 `company_match` 必须引用 `knowledge/company-profile.md` 中具体章节、条目或已核验的内部基线。公司基线为空白、过期、无法定位，或没有覆盖该能力时，输出 `待内部确认`；绝不因产品名称相似而假定具备能力。
+每一项 `company_match` 必须引用 `knowledge/company-profile.md` 中的稳定条目 ID，而不是只引用文件或章节。每个 `company_match` 必须引用一个或多个 `company_profile_entry_ids`。公司基线为空白、过期、无法定位，或没有覆盖该能力时，输出 `待内部确认`；绝不因产品名称相似而假定具备能力。
+
+引用前逐项核对条目的 `status`、`confidence`、`scope`、`evidence`、`updated_at` 和 `review_due`。`company_profile_entry_ids` 缺失、为空、引用不存在的 `id`，或条目 `status` 不是 `verified` 时，结论降级为 `待内部确认`。分析日期晚于任一条目的 `review_due` 时，该引用过期并降级为 `待内部确认`。
 
 ## L0-L3 定义
 
@@ -13,7 +15,7 @@
 
 ## 决策记录
 
-每个决定记录需求 `id`、匹配等级、公司基线引用、适用范围、前提条件、缺口、依赖和风险。任何 L0-L2 结论若缺少公司-profile citation，均降级为 `待内部确认`；已核验的外部证据只能说明外部事实，不能替代公司能力基线。
+每个决定记录需求 `id`、匹配等级、`company_profile_entry_ids`、适用范围、前提条件、缺口、依赖和风险。任何 L0-L2 结论若缺少公司-profile citation，均降级为 `待内部确认`；此处 citation 必须解析到存在、未过期且状态有效的条目 ID。已核验的外部证据只能说明外部事实，不能替代公司能力基线。
 
 ## 处理不确定性
 

@@ -208,6 +208,77 @@ OPPORTUNITY_STRATEGY_TOKENS = (
     "商业模型明显倒挂",
 )
 
+CLARIFICATION_RULE_TOKENS = (
+    "内部待确认清单",
+    "甲方正式澄清清单",
+    "priority",
+    "question",
+    "current_judgment",
+    "impact",
+    "owner",
+    "deadline",
+    "topic",
+    "formal_question",
+    "reason",
+    "response_format",
+    "timing",
+    "投标前必须确认",
+    "中标后可以深化",
+    "不建议主动询问",
+    "建议由原厂及合作伙伴确认",
+)
+
+REPORT_RULE_TOKENS = (
+    "00-material-index.md",
+    "01-opportunity-review-internal.md",
+    "02-opportunity-review-formal.md",
+    "03-clarification-internal.md",
+    "04-clarification-customer.md",
+    "05-response-compliance-matrix.md",
+    "06-evidence-register.md",
+    "project-analysis.yaml",
+    "白名单",
+    "内部底价",
+    "能力弱项",
+    "竞品策略",
+    "未经验证的主张",
+    "仅供内部审批的条件",
+    "原始推理笔记",
+    "决策摘要",
+    "参与建议",
+    "项目与采购包拆解",
+    "能力匹配",
+    "资格和废标风险",
+    "评审路径",
+    "隐藏工作量",
+    "人天和报价区间",
+    "商业模式和资金风险",
+    "竞品生态",
+    "投标及谈判策略",
+    "禁止承诺",
+    "退出条件",
+    "内部待确认事项",
+    "行动时间表",
+    "证据说明",
+    "项目理解",
+    "建设目标",
+    "需求和采购包分析",
+    "建议技术与实施边界",
+    "关键依赖",
+    "工作量和周期",
+    "风险及前置条件",
+    "正式澄清事项",
+    "服务与验收关注点",
+    "结论和后续建议",
+    "需求编号",
+    "原始要求和出处",
+    "响应结论",
+    "证据引用",
+    "责任人",
+    "状态",
+    "verification_status",
+)
+
 CAPABILITY_LEVEL_DEFINITIONS = {
     "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
     "L1 配置满足": "在已有能力内通过标准配置、参数设置或既有模板可满足",
@@ -514,6 +585,20 @@ def validate_package(root: Path) -> list[str]:
         )
     )
     errors.extend(require_evidence_contract(root / "references" / "evidence-rules.md"))
+    errors.extend(
+        require_tokens(
+            root / "references" / "clarification-questions.md",
+            "clarification rules",
+            CLARIFICATION_RULE_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "report-template.md",
+            "report rules",
+            REPORT_RULE_TOKENS,
+        )
+    )
     errors.extend(
         require_tokens(
             root / "references" / "requirement-analysis.md",

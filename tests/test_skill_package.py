@@ -97,6 +97,21 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_output_rules_require_two_clarification_sets_and_disclosure_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            references = root / "references"
+            references.mkdir(parents=True)
+            (references / "clarification-questions.md").write_text("# Clarifications\n", encoding="utf-8")
+            (references / "report-template.md").write_text("# Reports\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("clarification rules missing token: 内部待确认清单", errors)
+            self.assertIn("clarification rules missing token: 甲方正式澄清清单", errors)
+            self.assertIn("report rules missing token: 05-response-compliance-matrix.md", errors)
+            self.assertIn("report rules missing token: 白名单", errors)
+
     def test_current_package_has_no_capability_definition_errors(self) -> None:
         root = Path(__file__).resolve().parents[1]
 

@@ -119,6 +119,8 @@ COMPANY_PROFILE_GUARDRAIL_TOKENS = (
     "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
 )
 
+COMPANY_PROFILE_METADATA_FIELDS = ("更新时间", "维护人", "可信度")
+
 COMPANY_PROFILE_ENTRY_FIELDS = (
     "id", "statement", "scope", "evidence", "updated_at", "owner", "confidence", "status", "review_due",
 )
@@ -514,9 +516,6 @@ def require_skill_frontmatter(path: Path) -> list[str]:
     delimiters = [index for index, line in enumerate(lines) if line.strip() == "---"]
     if not lines or lines[0].strip() != "---" or len(delimiters) < 2:
         return ["SKILL.md invalid YAML frontmatter"]
-    if len(delimiters) > 2:
-        return ["SKILL.md duplicate YAML frontmatter"]
-
     closing = delimiters[1]
     fields: dict[str, str] = {}
     for line in lines[1:closing]:
@@ -527,6 +526,20 @@ def require_skill_frontmatter(path: Path) -> list[str]:
         if not key or key in fields:
             return ["SKILL.md invalid YAML frontmatter"]
         fields[key] = value.strip().strip("\"'")
+
+    for start, end in zip(delimiters[2:], delimiters[3:]):
+        candidate_lines = [line for line in lines[start + 1:end] if line.strip()]
+        candidate_fields = {
+            line.split(":", 1)[0].strip()
+            for line in candidate_lines
+            if re.match(r"^[A-Za-z_][A-Za-z0-9_-]*\s*:", line)
+        }
+        if (
+            candidate_lines
+            and len(candidate_fields) == len(candidate_lines)
+            and {"name", "description"} <= candidate_fields
+        ):
+            return ["SKILL.md duplicate YAML frontmatter"]
 
     errors: list[str] = []
     name = fields.get("name", "")
@@ -549,6 +562,17 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
         return []
     text = path.read_text(encoding="utf-8")
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
+
+
+def require_company_profile_metadata(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    metadata = markdown_section(path.read_text(encoding="utf-8"), "## 元数据")
+    return [
+        f"company profile metadata missing field: {field}"
+        for field in COMPANY_PROFILE_METADATA_FIELDS
+        if not re.search(rf"^- {re.escape(field)}：\S.*$", metadata, re.MULTILINE)
+    ]
 
 
 def markdown_section(text: str, heading: str) -> str:
@@ -1139,6 +1163,7 @@ def validate_package(root: Path) -> list[str]:
             COMPANY_PROFILE_HEADINGS,
         )
     )
+    errors.extend(require_company_profile_metadata(root / "knowledge" / "company-profile.md"))
     errors.extend(
         require_tokens(
             root / "knowledge" / "company-profile.md",

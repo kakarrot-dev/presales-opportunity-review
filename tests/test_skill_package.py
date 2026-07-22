@@ -256,6 +256,20 @@ class SkillPackageTests(unittest.TestCase):
 
             self.assertIn("SKILL.md duplicate YAML frontmatter", errors)
 
+    def test_checker_allows_body_horizontal_rule(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = (source_root / "SKILL.md").read_text(encoding="utf-8")
+            (root / "SKILL.md").write_text(
+                source + "\n---\n",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertNotIn("SKILL.md duplicate YAML frontmatter", errors)
+
     def test_checker_requires_exact_skill_name_and_nonempty_description(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -714,6 +728,26 @@ strategy.recommendation: Conditional Go
             errors = validate_package(root)
 
             self.assertIn("company profile entry schema missing field: review_due", errors)
+
+    def test_company_profile_rejects_missing_file_level_metadata_field(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        source = (source_root / "knowledge" / "company-profile.md").read_text(
+            encoding="utf-8"
+        )
+        for field, line in (
+            ("更新时间", "- 更新时间：待维护\n"),
+            ("维护人", "- 维护人：待维护\n"),
+            ("可信度", "- 可信度：待核验\n"),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                profile = root / "knowledge" / "company-profile.md"
+                profile.parent.mkdir(parents=True)
+                profile.write_text(source.replace(line, "", 1), encoding="utf-8")
+
+                errors = validate_package(root)
+
+                self.assertIn(f"company profile metadata missing field: {field}", errors)
 
     def test_capability_rules_require_entry_id_citation_and_expiry_fallback(self) -> None:
         source_root = Path(__file__).resolve().parents[1]

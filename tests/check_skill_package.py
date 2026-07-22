@@ -359,6 +359,95 @@ VERIFICATION_STATUSES = (
 
 VERIFICATION_STATUS_MARKER = "`verification_status` 只能使用以下状态："
 
+SKILL_REQUIRED_TOKENS = (
+    "knowledge/company-profile.md",
+    "references/material-classification.md",
+    "references/project-profiling.md",
+    "references/procurement-mechanism.md",
+    "references/research-rules.md",
+    "references/evidence-rules.md",
+    "references/requirement-analysis.md",
+    "references/capability-matching.md",
+    "references/effort-estimation.md",
+    "references/evaluation-analysis.md",
+    "references/opportunity-strategy.md",
+    "references/clarification-questions.md",
+    "references/report-template.md",
+    "默认执行外部检索",
+    "披露白名单",
+    "草稿—需人工复核",
+)
+
+SKILL_WORKFLOW_STAGES = tuple(
+    f"阶段 {number:02d}：{title}"
+    for number, title in enumerate(
+        (
+            "建立任务边界",
+            "盘点输入材料",
+            "提取与降级处理",
+            "生成材料索引",
+            "归一化项目事实",
+            "识别采购机制",
+            "执行外部检索",
+            "建立证据登记",
+            "读取公司基线",
+            "原子化需求",
+            "匹配公司能力",
+            "估算工作量与报价",
+            "分析资格与符合性",
+            "路由评审机制",
+            "形成参与策略",
+            "生成两类澄清清单",
+            "生成内部报告",
+            "独立生成正式报告",
+            "执行质量门槛并定稿",
+        ),
+        start=1,
+    )
+)
+
+SKILL_DEGRADATION_TOKENS = (
+    "不可读文件",
+    "OCR",
+    "畸形表格",
+    "加密或缺失页",
+    "多文件冲突",
+    "互联网不可用",
+    "过期公司基线",
+    "00-material-index.md",
+    "内部报告",
+    "正式报告",
+)
+
+SAMPLE_INPUT_TOKENS = (
+    "纯属虚构",
+    "表头上方有标题",
+    "空白工作表",
+    "分组明细",
+    "混合数量单位",
+    "利旧",
+    "供应商垫资",
+    "最低价",
+    "最高报价",
+    "原厂授权",
+    "同一一手来源",
+)
+
+SAMPLE_REPORT_TOKENS = (
+    "材料索引",
+    "采购机制",
+    "原子需求",
+    "L2 合作满足",
+    "合规风险",
+    "来源冲突",
+    "单一来源待验证",
+    "Conditional Go",
+    "内部待确认清单",
+    "甲方正式澄清清单",
+    "仅限内部的报价假设",
+    "正式报告摘录",
+)
+
 YAML_FENCE = re.compile(r"```yaml\s*\n(?P<body>.*?)```", re.DOTALL)
 YAML_MAPPING_LINE = re.compile(
     r"^(?P<indent>[ ]*)(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?P<value>.*)$"
@@ -660,11 +749,44 @@ def require_precedence(path: Path) -> list[str]:
     return []
 
 
+def require_ordered_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    positions = [text.find(token) for token in tokens]
+    if -1 in positions or positions != sorted(positions):
+        return [f"{label} invalid order"]
+    return []
+
+
+def require_example_contract(root: Path) -> list[str]:
+    input_path = root / "examples" / "sample-input.md"
+    report_path = root / "examples" / "sample-report.md"
+    errors = require_tokens(input_path, "sample input", SAMPLE_INPUT_TOKENS)
+    errors.extend(require_tokens(report_path, "sample report", SAMPLE_REPORT_TOKENS))
+
+    for path, label in ((input_path, "sample input"), (report_path, "sample report")):
+        if path.is_file() and re.search(r"https?://", path.read_text(encoding="utf-8")):
+            errors.append(f"{label} must not contain URLs")
+
+    if report_path.is_file():
+        text = report_path.read_text(encoding="utf-8")
+        formal_excerpt = markdown_section(text, "## 正式报告摘录")
+        for forbidden in ("内部底价", "仅限内部的报价假设"):
+            if forbidden in formal_excerpt:
+                errors.append(f"sample formal excerpt contains internal assumption: {forbidden}")
+    return errors
+
+
 def validate_package(root: Path) -> list[str]:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
         if not (root / relative_path).is_file():
             errors.append(f"missing: {relative_path}")
+    errors.extend(require_tokens(root / "SKILL.md", "SKILL.md", SKILL_REQUIRED_TOKENS))
+    errors.extend(require_ordered_tokens(root / "SKILL.md", "SKILL.md workflow", SKILL_WORKFLOW_STAGES))
+    errors.extend(require_tokens(root / "SKILL.md", "SKILL.md degradation", SKILL_DEGRADATION_TOKENS))
+    errors.extend(require_example_contract(root))
     errors.extend(
         require_tokens(
             root / "references" / "material-classification.md",

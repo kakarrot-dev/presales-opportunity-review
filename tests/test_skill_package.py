@@ -97,6 +97,22 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_skill_orchestrates_all_rules_and_sample_covers_quality_gates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "SKILL.md"
+            sample = root / "examples" / "sample-report.md"
+            sample.parent.mkdir(parents=True)
+            skill.write_text("---\nname: presales-opportunity-review\ndescription: Review.\n---\n", encoding="utf-8")
+            sample.write_text("# Sample\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md missing token: references/research-rules.md", errors)
+            self.assertIn("SKILL.md missing token: 草稿—需人工复核", errors)
+            self.assertIn("sample report missing token: 来源冲突", errors)
+            self.assertIn("sample report missing token: Conditional Go", errors)
+
     def test_output_rules_reject_reversed_or_drifted_formal_disclosure_lists(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:

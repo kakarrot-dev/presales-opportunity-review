@@ -97,6 +97,113 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_analysis_rule_contracts_reject_missing_or_swapped_guards(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        cases = (
+            ("requirement-analysis.md", "requirement rules", "原始要求和出处"),
+            ("requirement-analysis.md", "requirement rules", "交付物"),
+            ("requirement-analysis.md", "requirement rules", "依赖"),
+            ("requirement-analysis.md", "requirement rules", "验收"),
+            ("requirement-analysis.md", "requirement rules", "隐含工作"),
+            ("requirement-analysis.md", "requirement rules", "能力匹配"),
+            ("requirement-analysis.md", "requirement rules", "复杂度"),
+            ("requirement-analysis.md", "requirement rules", "工作量"),
+            ("requirement-analysis.md", "requirement rules", "风险"),
+            ("requirement-analysis.md", "requirement rules", "澄清"),
+            ("requirement-analysis.md", "requirement rules", "数据"),
+            ("requirement-analysis.md", "requirement rules", "接口"),
+            ("requirement-analysis.md", "requirement rules", "部署"),
+            ("requirement-analysis.md", "requirement rules", "迁移"),
+            ("requirement-analysis.md", "requirement rules", "定制"),
+            ("requirement-analysis.md", "requirement rules", "测试"),
+            ("requirement-analysis.md", "requirement rules", "培训"),
+            ("requirement-analysis.md", "requirement rules", "现场服务"),
+            ("requirement-analysis.md", "requirement rules", "质保"),
+            ("requirement-analysis.md", "requirement rules", "验收"),
+            ("capability-matching.md", "capability rules", "L0 直接满足"),
+            ("capability-matching.md", "capability rules", "L1 配置满足"),
+            ("capability-matching.md", "capability rules", "L2 合作满足"),
+            ("capability-matching.md", "capability rules", "L3 不建议承诺"),
+            ("capability-matching.md", "capability rules", "待内部确认"),
+            ("effort-estimation.md", "effort rules", "未经用户/公司授权不得生成最终或正式报价"),
+            ("effort-estimation.md", "effort rules", "投资"),
+            ("effort-estimation.md", "effort rules", "还款来源"),
+            ("effort-estimation.md", "effort rules", "运营期限"),
+            ("effort-estimation.md", "effort rules", "资产归属"),
+            ("effort-estimation.md", "effort rules", "验收前现金暴露"),
+            ("effort-estimation.md", "effort rules", "最坏情景损失"),
+        )
+
+        for filename, label, token in cases:
+            with self.subTest(filename=filename, token=token), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                target = root / "references" / filename
+                target.parent.mkdir(parents=True)
+                source = source_root / "references" / filename
+                target.write_text(
+                    source.read_text(encoding="utf-8").replace(token, "已删除"),
+                    encoding="utf-8",
+                )
+
+                errors = validate_package(root)
+
+                self.assertIn(f"{label} missing token: {token}", errors)
+
+    def test_capability_rules_reject_swapped_level_definition(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "capability-matching.md"
+            target.parent.mkdir(parents=True)
+            source = Path(__file__).resolve().parents[1] / "references" / "capability-matching.md"
+            target.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    "现有产品、技术或交付能力可在约定范围内直接满足",
+                    "需要已识别合作方、外部产品或外部服务",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("capability rules invalid definition: L0 直接满足", errors)
+
+    def test_estimation_rules_reject_missing_three_point_assumptions(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        cases = (
+            ("## 三点工作量", "乐观"),
+            ("## 三点工作量", "基准"),
+            ("## 三点工作量", "保守"),
+            ("## 三点工作量", "假设"),
+            ("## 三点工作量", "人数"),
+            ("## 三点工作量", "周期"),
+            ("## 三点工作量", "风险储备"),
+            ("## 三点报价", "乐观"),
+            ("## 三点报价", "基准"),
+            ("## 三点报价", "保守"),
+            ("## 三点报价", "假设"),
+            ("## 三点报价", "人数"),
+            ("## 三点报价", "周期"),
+            ("## 三点报价", "风险储备"),
+        )
+
+        for heading, token in cases:
+            with self.subTest(heading=heading, token=token), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                target = root / "references" / "effort-estimation.md"
+                target.parent.mkdir(parents=True)
+                source = (source_root / "references" / "effort-estimation.md").read_text(encoding="utf-8")
+                before, section, after = source.partition(heading)
+                section_body, next_heading, remainder = after.partition("## ")
+                target.write_text(
+                    before + section + section_body.replace(token, "已删除") + next_heading + remainder,
+                    encoding="utf-8",
+                )
+
+                errors = validate_package(root)
+
+                self.assertIn(f"effort rules missing {heading} token: {token}", errors)
+
     def test_analysis_modules_define_atomic_requirements_and_three_point_estimates(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

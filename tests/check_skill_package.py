@@ -131,15 +131,60 @@ EVIDENCE_RULE_TOKENS = (
 
 REQUIREMENT_ANALYSIS_TOKENS = (
     "原始要求和出处",
+    "交付物",
+    "依赖",
+    "验收",
+    "隐含工作",
+    "能力匹配",
+    "复杂度",
+    "工作量",
+    "风险",
+    "澄清",
+    "数据",
+    "接口",
+    "部署",
+    "迁移",
+    "定制",
+    "测试",
+    "培训",
+    "现场服务",
+    "质保",
 )
 
 CAPABILITY_MATCHING_TOKENS = (
+    "L0 直接满足",
+    "L1 配置满足",
+    "L2 合作满足",
     "L3 不建议承诺",
+    "待内部确认",
 )
 
 EFFORT_ESTIMATION_TOKENS = (
     "乐观",
+    "未经用户/公司授权不得生成最终或正式报价",
+    "投资",
+    "还款来源",
+    "运营期限",
+    "资产归属",
+    "验收前现金暴露",
     "最坏情景损失",
+)
+
+CAPABILITY_LEVEL_DEFINITIONS = {
+    "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
+    "L1 配置满足": "通过标准配置、参数设置或既有模板可满足",
+    "L2 合作满足": "需要已识别合作方、外部产品或外部服务",
+    "L3 不建议承诺": "不具备、存在不可接受边界，或关键依赖不可控",
+}
+
+THREE_POINT_ESTIMATE_TOKENS = (
+    "乐观",
+    "基准",
+    "保守",
+    "假设",
+    "人数",
+    "周期",
+    "风险储备",
 )
 
 EVIDENCE_FIELDS = (
@@ -185,6 +230,33 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
         return []
     text = path.read_text(encoding="utf-8")
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
+
+
+def require_capability_definitions(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [
+        f"capability rules invalid definition: {level}"
+        for level, definition in CAPABILITY_LEVEL_DEFINITIONS.items()
+        if f"`{level}`：{definition}" not in text
+    ]
+
+
+def require_estimation_section_tokens(path: Path, heading: str) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    _, marker, remainder = text.partition(heading)
+    if not marker:
+        section = ""
+    else:
+        section, _, _ = remainder.partition("\n## ")
+    return [
+        f"effort rules missing {heading} token: {token}"
+        for token in THREE_POINT_ESTIMATE_TOKENS
+        if token not in section
+    ]
 
 
 def yaml_mapping_paths(path: Path) -> dict[str, int] | None:
@@ -384,11 +456,22 @@ def validate_package(root: Path) -> list[str]:
             CAPABILITY_MATCHING_TOKENS,
         )
     )
+    errors.extend(require_capability_definitions(root / "references" / "capability-matching.md"))
     errors.extend(
         require_tokens(
             root / "references" / "effort-estimation.md",
             "effort rules",
             EFFORT_ESTIMATION_TOKENS,
+        )
+    )
+    errors.extend(
+        require_estimation_section_tokens(
+            root / "references" / "effort-estimation.md", "## 三点工作量"
+        )
+    )
+    errors.extend(
+        require_estimation_section_tokens(
+            root / "references" / "effort-estimation.md", "## 三点报价"
         )
     )
     return errors

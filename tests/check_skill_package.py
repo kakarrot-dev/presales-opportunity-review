@@ -46,6 +46,64 @@ PROJECT_PROFILING_TOKENS = (
     "evidence",
 )
 
+PROJECT_SCHEMA_TOKENS = (
+    "project",
+    "name",
+    "customer",
+    "industry",
+    "procurement_type",
+    "funding_model",
+    "current_stage",
+    "budget",
+    "delivery_scope",
+    "timeline",
+    "materials",
+    "provided",
+    "missing",
+    "parse_failures",
+    "conflicts",
+    "confidence",
+    "procurement",
+    "lots",
+    "joint_bid_policy",
+    "subcontract_policy",
+    "pricing_direction",
+    "quotation_rounds",
+    "evaluation_method",
+    "award_conditions",
+    "rule_conflicts",
+    "packages",
+    "competitors",
+    "direct",
+    "substitutes",
+    "partners",
+    "bid",
+    "qualification_items",
+    "compliance_items",
+    "rejection_risks",
+    "scoring_items",
+    "estimated_score",
+    "strategy",
+    "recommendation",
+    "participation_mode",
+    "conditions",
+    "exit_conditions",
+    "prohibited_commitments",
+    "pricing",
+    "negotiation",
+    "clarification_questions",
+    "evidence",
+)
+
+PROCUREMENT_PRECEDENCE = (
+    "latest clarification/modification",
+    "supplier instructions schedule",
+    "special terms",
+    "procurement requirements",
+    "general terms",
+    "response template",
+)
+
 PROCUREMENT_MECHANISM_TOKENS = (
     "procurement_type",
     "funding_model",
@@ -93,6 +151,16 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
 
 
+def require_precedence(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    positions = [text.find(token) for token in PROCUREMENT_PRECEDENCE]
+    if -1 in positions or positions != sorted(positions):
+        return ["procurement rules invalid precedence order"]
+    return []
+
+
 def validate_package(root: Path) -> list[str]:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
@@ -128,11 +196,19 @@ def validate_package(root: Path) -> list[str]:
     )
     errors.extend(
         require_tokens(
+            root / "references" / "project-profiling.md",
+            "project schema",
+            PROJECT_SCHEMA_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
             root / "references" / "procurement-mechanism.md",
             "procurement rules",
             PROCUREMENT_MECHANISM_TOKENS,
         )
     )
+    errors.extend(require_precedence(root / "references" / "procurement-mechanism.md"))
     return errors
 
 

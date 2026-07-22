@@ -29,25 +29,25 @@ description: Analyze heterogeneous tender and opportunity materials for presales
 
 严格按下列顺序执行。后续阶段不得改写上游事实或证据状态。
 
-1. **阶段 01：建立任务边界**：确认分析目标、截止时间、输出路径、材料范围和用户明示的限制；不替用户作出报价或承诺授权。
-2. **阶段 02：盘点输入材料**：枚举所有文件、附件、工作表、页面和内容区域，不忽略空白或疑似重复内容。
-3. **阶段 03：提取与降级处理**：按 `references/material-classification.md` 提取文本、表格、结构、数量原文与采购约束，对不可完整解析的内容执行降级规则。
-4. **阶段 04：生成材料索引**：先生成 `00-material-index.md`，为每个材料保存状态、可解析区域、可信度、来源、错误和降级记录。
-5. **阶段 05：归一化项目事实**：按 `references/project-profiling.md` 建立 `project-analysis.yaml`，保留缺失、冲突、解析失败与置信度。
-6. **阶段 06：识别采购机制**：按 `references/procurement-mechanism.md` 拆分标段、资金模式、报价方向、评审和授标约束，将原始规则冲突保留到 `procurement.rule_conflicts`。
-7. **阶段 07：执行外部检索**：除非用户明示禁止，默认执行外部检索。按 `references/research-rules.md` 将会影响参与决策的外部结论拆为原子主张，打开可追溯原始来源，不引用搜索摘要。
-8. **阶段 08：建立证据登记**：按 `references/evidence-rules.md` 为每个可核验主张建立证据记录，检查独立性、时效、适用范围和矛盾，不将转载数量当作独立来源数量。
-9. **阶段 09：读取公司基线**：在任何能力分析、工作量、报价或参与建议前，读取 `knowledge/company-profile.md`，记录其更新时间、可信度和缺失章节。
-10. **阶段 10：原子化需求**：按 `references/requirement-analysis.md` 按包件、交付物、验收、依赖和责任边界拆分需求，同时识别隐藏工作。
-11. **阶段 11：匹配公司能力**：仅在阶段 09 完成后，按 `references/capability-matching.md` 给出 L0-L3 或待内部确认，并引用公司基线。
-12. **阶段 12：估算工作量与报价**：按 `references/effort-estimation.md` 输出三点范围、假设与风险储备；未获授权时仅保留内部估算，不生成正式报价。
-13. **阶段 13：分析资格与符合性**：先识别硬性资格、原厂证明、响应性和废标风险，不把未知写成已满足。
-14. **阶段 14：路由评审机制**：按 `references/evaluation-analysis.md` 选择文件实际规定的评审路径；没有明确分值时不估算得分。
-15. **阶段 15：形成参与策略**：按 `references/opportunity-strategy.md` 输出推荐、参与身份、前置条件、退出条件和禁止承诺，不弱化 No-Go 门槛。
-16. **阶段 16：生成两类澄清清单**：按 `references/clarification-questions.md` 分别生成内部待确认清单和甲方正式澄清清单，两者不混用字段或敏感信息。
-17. **阶段 17：生成内部报告**：按 `references/report-template.md` 生成完整内部报告、符合性矩阵、证据登记和结构化分析。
-18. **阶段 18：独立生成正式报告**：仅从 `references/report-template.md` 的披露白名单独立生成正式报告和甲方澄清，不通过删减内部报告生成。
-19. **阶段 19：执行质量门槛并定稿**：执行下述质量门槛，写明每项 `PASS`/`FAIL`、证据和责任人，再确定交付状态。
+1. **阶段 01：接收用户材料**：接收文件、附件和用户补充说明，确认分析目标、截止时间、输出路径和用户明示的限制；不替用户作出报价或承诺授权。
+2. **阶段 02：枚举并识别有效内容**：按 `references/material-classification.md` 逐文件、附件、工作表、页面和内容区域建立记录，保留空白页/表、原始数量文本、采购约束和降级错误，生成 `00-material-index.md`。
+3. **阶段 03：读取公司能力基线**：在任何能力分析、工作量、报价或参与建议前，读取 `knowledge/company-profile.md`，记录更新时间、可信度、缺失和过期状态。
+4. **阶段 04：建立项目画像**：按 `references/project-profiling.md` 建立 `project-analysis.yaml`，只归一化材料直接支持的事实，保留缺失、冲突、解析失败和置信度。
+5. **阶段 05：识别采购机制**：按 `references/procurement-mechanism.md` 识别采购类型、资金模式、报价方向、轮次、评审和授标约束，不默认低价中标。
+6. **阶段 06：检查条款优先级与冲突**：按采购规则优先级比对版本与条款，将无法裁决的原始矛盾同时写入 `materials.conflicts` 和 `procurement.rule_conflicts`。
+7. **阶段 07：检查材料完整度**：逐项检查应有文件、页码、附件、工作表和关键条款，将不可读、空白、加密、缺页和缺件作为可追溯降级项。
+8. **阶段 08：默认执行外部调查**：除非用户明示禁止，默认执行外部调查。按 `references/research-rules.md` 拆分原子主张并打开原始来源，再按 `references/evidence-rules.md` 建立证据记录；不直接引用搜索摘要。
+9. **阶段 09：拆分标段/采购包/需求项**：按 `references/requirement-analysis.md` 先拆标段与采购包，再按交付物、验收、依赖和责任边界形成可追溯的原子需求。
+10. **阶段 10：分析资格及响应合规**：按 `references/evaluation-analysis.md` 识别硬性资格、原厂证明、响应性、可补正性和废标风险，不把未知写成已满足。
+11. **阶段 11：逐条能力匹配**：仅在阶段 03 完成后，按 `references/capability-matching.md` 对每条原子需求给出 L0-L3 或待内部确认，并引用公司基线。
+12. **阶段 12：隐藏工作量和风险**：按 `references/requirement-analysis.md` 逐项检查数据、接口、部署、迁移、定制、测试、培训、现场服务、质保和验收，记录触发条件、影响与缓解动作。
+13. **阶段 13：竞品和厂商生态**：只基于采购材料或已核验证据识别直接竞品、替代方案、原厂和潜在合作方，记录授权、合作边界和失效影响。
+14. **阶段 14：评审与成交路径**：按 `references/evaluation-analysis.md` 选择文件实际规定的评审、排序、谈判和授标路径；没有明确分值时不估算得分。
+15. **阶段 15：人天/周期/报价区间**：按 `references/effort-estimation.md` 输出三点人天、人员、周期和报价区间，附假设、不含项和风险储备；未获授权时仅保留内部估算。
+16. **阶段 16：参与模式和成立条件**：按 `references/opportunity-strategy.md` 输出推荐、参与身份、成立条件、退出条件和禁止承诺，不用 Conditional Go 弱化 No-Go 或信息不足门槛。
+17. **阶段 17：两套澄清清单**：按 `references/clarification-questions.md` 分别生成内部待确认清单和甲方正式澄清清单，两者不混用字段或敏感信息。
+18. **阶段 18：内部版和正式版**：按 `references/report-template.md` 生成完整内部版；仅从披露白名单独立生成正式版和甲方澄清，不通过删减内部报告生成。
+19. **阶段 19：证据/矛盾/完整性/敏感信息质量检查**：对证据状态、来源矛盾、材料完整度、公司基线、资格商业门槛与敏感信息披露逐项记录 `PASS`/`FAIL`、证据、责任人和关闭动作，再确定交付状态。
 
 ## 降级处理
 
@@ -66,6 +66,10 @@ description: Analyze heterogeneous tender and opportunity materials for presales
 所有降级必须同时出现在 `00-material-index.md`、内部报告与正式报告的适用范围/风险中；正式报告只披露对方可见且会影响范围、依赖、验收或结论的降级结果，不披露内部推理。
 
 ## 质量门槛
+
+只有 `已由一手来源确认` 或 `已交叉验证` 能支持正式报告中的确定性事实；`单一来源待验证`、`来源冲突` 和 `无法验证` 均禁止作为正式确定事实。证据质量检查必须逐条核对 `source_date`、`accessed_at`、独立来源和循环转载；循环转载只计一个来源。
+
+公司基线门槛 `FAIL` 时，当前 `company_match` 必须为 `待内部确认`，当前 `strategy.recommendation` 必须为 `Insufficient Information`。L0-L2 或 Go/Conditional Go 只能放入明确标注“非当前结论”的条件分支。
 
 | 门槛 | PASS 条件 | 失败处理 |
 | --- | --- | --- |

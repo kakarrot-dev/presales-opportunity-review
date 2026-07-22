@@ -97,6 +97,93 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_checker_rejects_drift_from_the_approved_19_stage_workflow(self) -> None:
+        approved_stages = (
+            "接收用户材料", "枚举并识别有效内容", "读取公司能力基线", "建立项目画像",
+            "识别采购机制", "检查条款优先级与冲突", "检查材料完整度", "默认执行外部调查",
+            "拆分标段/采购包/需求项", "分析资格及响应合规", "逐条能力匹配", "隐藏工作量和风险",
+            "竞品和厂商生态", "评审与成交路径", "人天/周期/报价区间", "参与模式和成立条件",
+            "两套澄清清单", "内部版和正式版", "证据/矛盾/完整性/敏感信息质量检查",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "SKILL.md"
+            lines = [
+                f"{number}. **阶段 {number:02d}：{title}**：执行。"
+                for number, title in enumerate(approved_stages, start=1)
+            ]
+            lines[5], lines[6] = lines[6], lines[5]
+            skill.write_text("\n".join(lines), encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md invalid approved 19-stage workflow", errors)
+
+    def test_checker_rejects_baseline_failure_without_current_fallback_and_isolated_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            report.write_text(
+                """## 当前能力与策略结论
+company_match: L2 合作满足
+strategy.recommendation: Conditional Go
+
+## 质量门槛
+| 门槛 | 状态 | 证据/失败原因 | 关闭动作 |
+| 公司基线 | FAIL | 过期 | 更新 |
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report baseline FAIL requires current company_match: 待内部确认", errors)
+            self.assertIn("sample report baseline FAIL requires current strategy.recommendation: Insufficient Information", errors)
+            self.assertIn("sample report missing isolated conditional branch", errors)
+            self.assertIn("sample report conditional conclusions must not be current", errors)
+
+    def test_checker_requires_workbook_level_records_separate_web_rows_and_quality_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            report.write_text(
+                """## 材料索引
+| id | path | format | content_regions | status | parse_confidence | provenance | errors |
+| M001 | 采购清单.xlsx | xlsx | 采购清单、备用页 | partial | medium | 样例 | 无 |
+| M003-M004 | 两篇网页 | markdown | 摘录 | partial | low | 同源 | 无 |
+
+## 质量门槛
+| 门槛 | 状态 | 证据/失败原因 | 关闭动作 |
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report missing workbook/sheet records: M001 and M001-S01", errors)
+            self.assertIn("sample report missing empty worksheet record: M001-S02", errors)
+            self.assertIn("sample report must separate material rows: M003 and M004", errors)
+            self.assertIn("sample report quality gate missing owner column", errors)
+
+    def test_checker_requires_formal_evidence_gate_and_provenance_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "SKILL.md"
+            skill.write_text(
+                """正式报告可使用所有 verification_status。
+检查来源。
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("SKILL.md missing formal evidence gate", errors)
+            self.assertIn("SKILL.md missing evidence provenance checks", errors)
+            self.assertIn("SKILL.md missing baseline failure fallback", errors)
+
     def test_skill_orchestrates_all_rules_and_sample_covers_quality_gates(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

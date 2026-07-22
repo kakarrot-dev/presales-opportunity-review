@@ -373,7 +373,7 @@ SKILL_REQUIRED_TOKENS = (
     "references/opportunity-strategy.md",
     "references/clarification-questions.md",
     "references/report-template.md",
-    "默认执行外部检索",
+    "默认执行外部调查",
     "披露白名单",
     "草稿—需人工复核",
 )
@@ -382,25 +382,25 @@ SKILL_WORKFLOW_STAGES = tuple(
     f"阶段 {number:02d}：{title}"
     for number, title in enumerate(
         (
-            "建立任务边界",
-            "盘点输入材料",
-            "提取与降级处理",
-            "生成材料索引",
-            "归一化项目事实",
+            "接收用户材料",
+            "枚举并识别有效内容",
+            "读取公司能力基线",
+            "建立项目画像",
             "识别采购机制",
-            "执行外部检索",
-            "建立证据登记",
-            "读取公司基线",
-            "原子化需求",
-            "匹配公司能力",
-            "估算工作量与报价",
-            "分析资格与符合性",
-            "路由评审机制",
-            "形成参与策略",
-            "生成两类澄清清单",
-            "生成内部报告",
-            "独立生成正式报告",
-            "执行质量门槛并定稿",
+            "检查条款优先级与冲突",
+            "检查材料完整度",
+            "默认执行外部调查",
+            "拆分标段/采购包/需求项",
+            "分析资格及响应合规",
+            "逐条能力匹配",
+            "隐藏工作量和风险",
+            "竞品和厂商生态",
+            "评审与成交路径",
+            "人天/周期/报价区间",
+            "参与模式和成立条件",
+            "两套澄清清单",
+            "内部版和正式版",
+            "证据/矛盾/完整性/敏感信息质量检查",
         ),
         start=1,
     )
@@ -446,6 +446,20 @@ SAMPLE_REPORT_TOKENS = (
     "甲方正式澄清清单",
     "仅限内部的报价假设",
     "正式报告摘录",
+    "| 公司基线 | FAIL |",
+)
+
+FORMAL_EVIDENCE_GATE_RULE = (
+    "只有 `已由一手来源确认` 或 `已交叉验证` 能支持正式报告中的确定性事实；"
+    "`单一来源待验证`、`来源冲突` 和 `无法验证` 均禁止作为正式确定事实。"
+)
+EVIDENCE_PROVENANCE_RULE = (
+    "证据质量检查必须逐条核对 `source_date`、`accessed_at`、独立来源和循环转载；"
+    "循环转载只计一个来源。"
+)
+BASELINE_FAILURE_RULE = (
+    "公司基线门槛 `FAIL` 时，当前 `company_match` 必须为 `待内部确认`，"
+    "当前 `strategy.recommendation` 必须为 `Insufficient Information`。"
 )
 
 YAML_FENCE = re.compile(r"```yaml\s*\n(?P<body>.*?)```", re.DOTALL)
@@ -749,14 +763,94 @@ def require_precedence(path: Path) -> list[str]:
     return []
 
 
-def require_ordered_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
+def require_skill_orchestration(path: Path) -> list[str]:
     if not path.is_file():
         return []
     text = path.read_text(encoding="utf-8")
-    positions = [text.find(token) for token in tokens]
-    if -1 in positions or positions != sorted(positions):
-        return [f"{label} invalid order"]
-    return []
+    actual_stages = tuple(
+        match.group(1)
+        for match in re.finditer(r"^\d+\. \*\*(阶段 \d{2}：[^*]+)\*\*", text, re.MULTILINE)
+    )
+    errors = (
+        []
+        if actual_stages == SKILL_WORKFLOW_STAGES
+        else ["SKILL.md invalid approved 19-stage workflow"]
+    )
+    if FORMAL_EVIDENCE_GATE_RULE not in text:
+        errors.append("SKILL.md missing formal evidence gate")
+    if EVIDENCE_PROVENANCE_RULE not in text:
+        errors.append("SKILL.md missing evidence provenance checks")
+    if BASELINE_FAILURE_RULE not in text:
+        errors.append("SKILL.md missing baseline failure fallback")
+    return errors
+
+
+def markdown_table_rows(section: str) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for line in section.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells and not all(set(cell) <= {"-", ":"} for cell in cells):
+            rows.append(cells)
+    return rows
+
+
+def require_sample_report_semantics(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    errors: list[str] = []
+
+    current = markdown_section(text, "## 当前能力与策略结论")
+    quality_rows = markdown_table_rows(markdown_section(text, "## 质量门槛"))
+    baseline_failed = any(
+        len(row) >= 2 and row[0] == "公司基线" and row[1] == "FAIL"
+        for row in quality_rows
+    )
+    if baseline_failed and "`company_match`: `待内部确认`" not in current:
+        errors.append("sample report baseline FAIL requires current company_match: 待内部确认")
+    if baseline_failed and "`strategy.recommendation`: `Insufficient Information`" not in current:
+        errors.append(
+            "sample report baseline FAIL requires current strategy.recommendation: Insufficient Information"
+        )
+
+    conditional = markdown_section(text, "## 条件分支（非当前结论）")
+    conditional_tokens = (
+        "基线更新且合作方验证后",
+        "L2 合作满足",
+        "Conditional Go",
+        "非当前结论",
+    )
+    if any(token not in conditional for token in conditional_tokens):
+        errors.append("sample report missing isolated conditional branch")
+    before_conditional, conditional_marker, conditional_remainder = text.partition(
+        "## 条件分支（非当前结论）"
+    )
+    if conditional_marker:
+        _, next_heading, after_conditional = conditional_remainder.partition("\n## ")
+        outside_conditional = before_conditional + (
+            f"\n## {after_conditional}" if next_heading else ""
+        )
+    else:
+        outside_conditional = text
+    if "L2 合作满足" in outside_conditional or "Conditional Go" in outside_conditional:
+        errors.append("sample report conditional conclusions must not be current")
+
+    material_rows = markdown_table_rows(markdown_section(text, "## 材料索引"))
+    material_by_id = {row[0]: row for row in material_rows if row}
+    if "M001" not in material_by_id or "M001-S01" not in material_by_id:
+        errors.append("sample report missing workbook/sheet records: M001 and M001-S01")
+    empty_sheet = material_by_id.get("M001-S02", [])
+    if len(empty_sheet) < 5 or empty_sheet[4] != "empty":
+        errors.append("sample report missing empty worksheet record: M001-S02")
+    if "M003" not in material_by_id or "M004" not in material_by_id or "M003-M004" in material_by_id:
+        errors.append("sample report must separate material rows: M003 and M004")
+
+    quality_header = quality_rows[0] if quality_rows else []
+    if "责任人" not in quality_header:
+        errors.append("sample report quality gate missing owner column")
+    return errors
 
 
 def require_example_contract(root: Path) -> list[str]:
@@ -775,6 +869,7 @@ def require_example_contract(root: Path) -> list[str]:
         for forbidden in ("内部底价", "仅限内部的报价假设"):
             if forbidden in formal_excerpt:
                 errors.append(f"sample formal excerpt contains internal assumption: {forbidden}")
+    errors.extend(require_sample_report_semantics(report_path))
     return errors
 
 
@@ -784,7 +879,7 @@ def validate_package(root: Path) -> list[str]:
         if not (root / relative_path).is_file():
             errors.append(f"missing: {relative_path}")
     errors.extend(require_tokens(root / "SKILL.md", "SKILL.md", SKILL_REQUIRED_TOKENS))
-    errors.extend(require_ordered_tokens(root / "SKILL.md", "SKILL.md workflow", SKILL_WORKFLOW_STAGES))
+    errors.extend(require_skill_orchestration(root / "SKILL.md"))
     errors.extend(require_tokens(root / "SKILL.md", "SKILL.md degradation", SKILL_DEGRADATION_TOKENS))
     errors.extend(require_example_contract(root))
     errors.extend(

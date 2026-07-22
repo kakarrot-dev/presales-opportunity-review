@@ -299,12 +299,18 @@ FORMAL_REPORT_SECTIONS = (
 FORMAL_REPORT_EXCLUSIONS = (
     "内部底价", "能力弱项", "竞品策略", "未经验证的主张", "仅供内部审批的条件", "原始推理笔记",
 )
+FORMAL_REPORT_ALLOWLIST = (
+    "采购材料直接支持的项目事实", "已核验的能力与证据", "明确标注的方案边界", "正式澄清问题",
+    "风险及前置条件", "经批准的工作量和周期表述", "已批准的结论和后续建议",
+)
 COMPLIANCE_MATRIX_FIELDS = ("要求", "类型", "原文位置", "响应材料", "当前状态", "后果", "责任人")
 COMPLIANCE_TYPES = (
     "主体与信用资格", "人员和案例证明", "保证金", "有效期", "时间节点", "签章装订", "报价", "技术响应",
     "原厂证明", "接口", "安全", "交付", "验收", "联合体", "分包", "关联关系限制",
 )
 FORMAL_INDEPENDENT_GENERATION_RULE = "正式版必须从披露白名单独立生成，不得通过对内部版删减或删除敏感段落生成。"
+FORMAL_ALLOWLIST_RULE = "`02-opportunity-review-formal.md`、`04-clarification-customer.md` 和对甲方交付的响应片段只能使用披露白名单中的允许项。"
+FORMAL_PROHIBITION_RULE = "正式版严禁包含以下内容："
 
 CAPABILITY_LEVEL_DEFINITIONS = {
     "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
@@ -444,7 +450,16 @@ def require_report_contract(path: Path) -> list[str]:
     if FORMAL_INDEPENDENT_GENERATION_RULE not in markdown_section(text, "## 正式报告白名单"):
         errors.append("report rules missing formal independent generation rule")
     whitelist = markdown_section(text, "## 正式报告白名单")
-    if any(token not in whitelist for token in FORMAL_REPORT_EXCLUSIONS):
+    if FORMAL_ALLOWLIST_RULE not in whitelist:
+        errors.append("report rules missing formal allowlist rule")
+    errors.extend(require_exact_values(
+        "report rules invalid formal allowlist",
+        markdown_list_items(markdown_subsection(whitelist, "### 正式版允许项")),
+        FORMAL_REPORT_ALLOWLIST,
+    ))
+    if FORMAL_PROHIBITION_RULE not in whitelist:
+        errors.append("report rules missing formal prohibition rule")
+    if markdown_list_items(markdown_subsection(whitelist, "### 正式版严禁项")) != FORMAL_REPORT_EXCLUSIONS:
         errors.append("report rules invalid formal exclusions")
     matrix = markdown_section(text, "## 05-response-compliance-matrix.md")
     errors.extend(require_exact_values(

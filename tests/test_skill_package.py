@@ -97,6 +97,32 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_output_rules_reject_reversed_or_drifted_formal_disclosure_lists(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "report-template.md"
+            target.parent.mkdir(parents=True)
+            target.write_text(
+                (source_root / "references" / "report-template.md")
+                .read_text(encoding="utf-8")
+                .replace("正式版严禁包含以下内容：", "正式版允许包含以下内容：")
+                .replace(
+                    "- 风险及前置条件\n- 经批准的工作量和周期表述\n",
+                    "- 未授权允许项\n- 经批准的工作量和周期表述\n",
+                    1,
+                )
+                .replace("- 原始推理笔记\n", "")
+                .replace("- 竞品策略\n", "- 竞品策略\n- 未授权禁项\n"),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("report rules invalid formal allowlist", errors)
+            self.assertIn("report rules missing formal prohibition rule", errors)
+            self.assertIn("report rules invalid formal exclusions", errors)
+
     def test_output_rules_reject_misplaced_fields_and_invalid_customer_timing(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:

@@ -97,6 +97,14 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_current_package_has_no_capability_definition_errors(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+
+        errors = validate_package(root)
+
+        self.assertNotIn("capability rules invalid definition: L1 配置满足", errors)
+        self.assertNotIn("capability rules invalid definition: L3 不建议承诺", errors)
+
     def test_evaluation_routes_without_assuming_scoring_and_strategy_has_guardrails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

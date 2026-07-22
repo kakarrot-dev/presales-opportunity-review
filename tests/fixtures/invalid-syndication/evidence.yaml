@@ -1,0 +1,28 @@
+evidence:
+  - id: E-SYN-001
+    claim: "示例采购方发布了一个示例项目公告。"
+    source: "示例行业媒体甲"
+    location: "全文"
+    url: "https://example.invalid/media-a/example-project"
+    source_date: "2026-01-15"
+    accessed_at: "2026-01-16"
+    verification_status: "单一来源待验证"
+    independent_sources:
+      - "示例采购方新闻稿"
+    contradictions: []
+    confidence: low
+    source_origin: "示例采购方新闻稿"
+  - id: E-SYN-002
+    claim: "示例采购方发布了一个示例项目公告。"
+    source: "示例行业媒体乙"
+    location: "全文"
+    url: "https://example.invalid/media-b/example-project"
+    source_date: "2026-01-16"
+    accessed_at: "2026-01-16"
+    verification_status: "单一来源待验证"
+    independent_sources:
+      - "示例采购方新闻稿"
+    contradictions: []
+    confidence: low
+    source_origin: "示例采购方新闻稿"
+expected_status: "单一来源待验证"

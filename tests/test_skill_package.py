@@ -189,3 +189,21 @@ class SkillPackageTests(unittest.TestCase):
             errors = validate_package(root)
 
             self.assertIn("procurement rules invalid precedence order", errors)
+
+    def test_research_rules_reject_search_snippets_and_syndication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            research = root / "references" / "research-rules.md"
+            evidence = root / "references" / "evidence-rules.md"
+            research.parent.mkdir(parents=True)
+            research.write_text("# Research\n", encoding="utf-8")
+            evidence.write_text("# Evidence\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn(
+                "research rules missing token: 搜索结果摘要不能直接作为事实依据",
+                errors,
+            )
+            self.assertIn("research rules missing token: 只算一个来源", errors)
+            self.assertIn("evidence rules missing token: verification_status", errors)

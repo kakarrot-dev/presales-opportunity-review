@@ -1,0 +1,30 @@
+evidence:
+  - id: E-CON-001
+    claim: "示例采购方公布的示例项目授标金额为 120 万示例货币单位。"
+    source: "示例采购方授标公告"
+    location: "第 3 段"
+    url: "https://example.invalid/authority/example-award"
+    source_date: "2026-02-01"
+    accessed_at: "2026-02-02"
+    verification_status: "来源冲突"
+    independent_sources:
+      - "示例采购方授标公告"
+      - "示例资讯汇总"
+    contradictions:
+      - "示例资讯汇总称授标金额为 150 万示例货币单位。"
+    confidence: low
+  - id: E-CON-002
+    claim: "示例采购方公布的示例项目授标金额为 150 万示例货币单位。"
+    source: "示例资讯汇总"
+    location: "金额字段"
+    url: "https://example.invalid/secondary/example-award"
+    source_date: "2026-02-01"
+    accessed_at: "2026-02-02"
+    verification_status: "来源冲突"
+    independent_sources:
+      - "示例采购方授标公告"
+      - "示例资讯汇总"
+    contradictions:
+      - "示例采购方授标公告称授标金额为 120 万示例货币单位。"
+    confidence: low
+expected_status: "来源冲突"

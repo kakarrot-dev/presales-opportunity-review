@@ -109,6 +109,38 @@ COMPANY_PROFILE_GUARDRAIL_TOKENS = (
     "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
 )
 
+RESEARCH_RULE_TOKENS = (
+    "搜索结果摘要不能直接作为事实依据",
+    "原子主张",
+    "优先使用一手来源",
+    "一个一手来源，或两个相互独立的可靠来源",
+    "只算一个来源",
+    "实体、日期、金额、单位和适用范围必须逐项匹配",
+    "来源新鲜度",
+    "保留矛盾证据",
+    "待验证",
+)
+
+EVIDENCE_RULE_TOKENS = (
+    "id",
+    "claim",
+    "source",
+    "location",
+    "url",
+    "source_date",
+    "accessed_at",
+    "verification_status",
+    "independent_sources",
+    "contradictions",
+    "confidence",
+    "已由一手来源确认",
+    "已交叉验证",
+    "单一来源待验证",
+    "来源冲突",
+    "无法验证",
+    "不能作为正式报告的确定性事实",
+)
+
 YAML_FENCE = re.compile(r"```yaml\s*\n(?P<body>.*?)```", re.DOTALL)
 YAML_MAPPING_LINE = re.compile(
     r"^(?P<indent>[ ]*)(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?P<value>.*)$"
@@ -227,6 +259,20 @@ def validate_package(root: Path) -> list[str]:
         )
     )
     errors.extend(require_precedence(root / "references" / "procurement-mechanism.md"))
+    errors.extend(
+        require_tokens(
+            root / "references" / "research-rules.md",
+            "research rules",
+            RESEARCH_RULE_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "evidence-rules.md",
+            "evidence rules",
+            EVIDENCE_RULE_TOKENS,
+        )
+    )
     return errors
 
 

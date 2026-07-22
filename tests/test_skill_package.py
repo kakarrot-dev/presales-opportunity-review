@@ -97,6 +97,21 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_evaluation_routes_without_assuming_scoring_and_strategy_has_guardrails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            references = root / "references"
+            references.mkdir(parents=True)
+            (references / "evaluation-analysis.md").write_text("# Evaluation\n", encoding="utf-8")
+            (references / "opportunity-strategy.md").write_text("# Strategy\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("evaluation rules missing token: 最高投入或最高报价排序", errors)
+            self.assertIn("evaluation rules missing token: 只有存在明确分值时", errors)
+            self.assertIn("strategy rules missing token: Insufficient Information", errors)
+            self.assertIn("strategy rules missing token: prohibited_commitments", errors)
+
     def test_requirement_rules_reject_tokens_deleted_only_from_required_sections(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

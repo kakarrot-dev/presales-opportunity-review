@@ -170,6 +170,44 @@ EFFORT_ESTIMATION_TOKENS = (
     "最坏情景损失",
 )
 
+EVALUATION_ANALYSIS_TOKENS = (
+    "资格及符合性审查",
+    "最低价法",
+    "最高投入或最高报价排序",
+    "综合评分法",
+    "多轮谈判",
+    "主观方案评审",
+    "未明确",
+    "硬性资格",
+    "废标风险",
+    "可补正的实质性问题",
+    "合作方依赖",
+    "未知状态",
+    "只有存在明确分值时",
+)
+
+OPPORTUNITY_STRATEGY_TOKENS = (
+    "Go",
+    "Conditional Go",
+    "No-Go",
+    "Insufficient Information",
+    "participation_mode",
+    "conditions",
+    "exit_conditions",
+    "prohibited_commitments",
+    "独立主包",
+    "联合投标",
+    "总集成",
+    "软件分包",
+    "技术服务分包",
+    "原厂生态合作",
+    "仅参与部分采购项",
+    "放弃",
+    "重大资质缺口",
+    "责任不可控",
+    "商业模型明显倒挂",
+)
+
 CAPABILITY_LEVEL_DEFINITIONS = {
     "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
     "L1 配置满足": "通过标准配置、参数设置或既有模板可满足",
@@ -507,6 +545,20 @@ def validate_package(root: Path) -> list[str]:
     errors.extend(
         require_estimation_section_tokens(
             root / "references" / "effort-estimation.md", "## 三点报价"
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "evaluation-analysis.md",
+            "evaluation rules",
+            EVALUATION_ANALYSIS_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "opportunity-strategy.md",
+            "strategy rules",
+            OPPORTUNITY_STRATEGY_TOKENS,
         )
     )
     return errors

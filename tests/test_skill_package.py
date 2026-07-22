@@ -54,6 +54,42 @@ strategy:
 evidence: []
 ```"""
 
+EVIDENCE_FIELDS = {
+    "id",
+    "claim",
+    "source",
+    "location",
+    "url",
+    "source_date",
+    "accessed_at",
+    "verification_status",
+    "independent_sources",
+    "contradictions",
+    "confidence",
+}
+
+def fixture_records(path: Path) -> tuple[list[dict[str, str]], str]:
+    records: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    expected_status = ""
+    list_key: str | None = None
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("  - id:"):
+            current = {"id": line.split(":", 1)[1].strip()}
+            records.append(current)
+            list_key = None
+        elif current is not None and line.startswith("    ") and ":" in line:
+            key, value = line.strip().split(":", 1)
+            current[key] = value.strip()
+            list_key = key if not value.strip() else None
+        elif current is not None and list_key and line.startswith("      - "):
+            current[list_key] = line.removeprefix("      - ").strip()
+        elif line.startswith("expected_status:"):
+            expected_status = line.split(":", 1)[1].strip().strip('"')
+
+    return records, expected_status
+
 
 class SkillPackageTests(unittest.TestCase):
     def test_minimal_package_requires_all_references(self) -> None:
@@ -207,3 +243,121 @@ class SkillPackageTests(unittest.TestCase):
             )
             self.assertIn("research rules missing token: 只算一个来源", errors)
             self.assertIn("evidence rules missing token: verification_status", errors)
+
+    def test_evidence_rules_reject_extra_schema_fields_and_statuses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "references" / "evidence-rules.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(
+                """```yaml
+evidence:
+  id: E001
+  claim: example
+  source: example
+  location: example
+  url: null
+  source_date: null
+  accessed_at: null
+  verification_status: 单一来源待验证
+  independent_sources: []
+  contradictions: []
+  confidence: low
+  source_origin: example
+```
+
+`verification_status` 只能使用以下状态：
+
+- 已由一手来源确认
+- 已交叉验证
+- 单一来源待验证
+- 来源冲突
+- 无法验证
+- 待验证
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("evidence rules unexpected field: source_origin", errors)
+            self.assertIn("evidence rules invalid verification statuses", errors)
+
+    def test_evidence_rules_reject_fields_outside_the_evidence_record(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "references" / "evidence-rules.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(
+                """id claim source location url source_date accessed_at verification_status
+independent_sources contradictions confidence
+
+```yaml
+evidence: []
+```
+
+`verification_status` 只能使用以下状态：
+
+- 已由一手来源确认
+- 已交叉验证
+- 单一来源待验证
+- 来源冲突
+- 无法验证
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("evidence rules missing field: id", errors)
+
+    def test_research_rules_require_explicit_unverified_status_mapping(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            research = root / "references" / "research-rules.md"
+            research.parent.mkdir(parents=True)
+            research.write_text(
+                """搜索结果摘要不能直接作为事实依据
+原子主张
+优先使用一手来源
+一个一手来源，或两个相互独立的可靠来源
+只算一个来源
+实体、日期、金额、单位和适用范围必须逐项匹配
+来源新鲜度
+保留矛盾证据
+待验证
+""",
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn(
+                "research rules missing token: 单一或低质量来源标记为单一来源待验证",
+                errors,
+            )
+            self.assertIn(
+                "research rules missing token: 无法取得可核验来源标记为无法验证",
+                errors,
+            )
+            self.assertIn("research rules missing token: 不得产生裸待验证状态", errors)
+
+    def test_evidence_fixtures_match_the_exact_record_contract(self) -> None:
+        fixture_root = Path(__file__).parent / "fixtures"
+        syndication, syndication_status = fixture_records(
+            fixture_root / "invalid-syndication" / "evidence.yaml"
+        )
+        conflict, conflict_status = fixture_records(
+            fixture_root / "source-conflict" / "evidence.yaml"
+        )
+
+        self.assertEqual(syndication_status, "单一来源待验证")
+        self.assertEqual({record["verification_status"].strip('"') for record in syndication}, {syndication_status})
+        self.assertTrue(all(set(record) == EVIDENCE_FIELDS for record in syndication))
+        self.assertEqual(
+            {record["independent_sources"] for record in syndication},
+            {'"示例采购方新闻稿"'},
+        )
+        self.assertEqual(conflict_status, "来源冲突")
+        self.assertEqual({record["verification_status"].strip('"') for record in conflict}, {conflict_status})
+        self.assertTrue(all(set(record) == EVIDENCE_FIELDS for record in conflict))

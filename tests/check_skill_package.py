@@ -119,9 +119,17 @@ RESEARCH_RULE_TOKENS = (
     "来源新鲜度",
     "保留矛盾证据",
     "待验证",
+    "单一或低质量来源标记为单一来源待验证",
+    "无法取得可核验来源标记为无法验证",
+    "不得产生裸待验证状态",
 )
 
 EVIDENCE_RULE_TOKENS = (
+    "verification_status",
+    "不能作为正式报告的确定性事实",
+)
+
+EVIDENCE_FIELDS = (
     "id",
     "claim",
     "source",
@@ -133,13 +141,17 @@ EVIDENCE_RULE_TOKENS = (
     "independent_sources",
     "contradictions",
     "confidence",
+)
+
+VERIFICATION_STATUSES = (
     "已由一手来源确认",
     "已交叉验证",
     "单一来源待验证",
     "来源冲突",
     "无法验证",
-    "不能作为正式报告的确定性事实",
 )
+
+VERIFICATION_STATUS_MARKER = "`verification_status` 只能使用以下状态："
 
 YAML_FENCE = re.compile(r"```yaml\s*\n(?P<body>.*?)```", re.DOTALL)
 YAML_MAPPING_LINE = re.compile(
@@ -204,6 +216,62 @@ def require_project_schema(path: Path) -> list[str]:
         f"project schema unexpected path: {schema_path}"
         for schema_path in sorted(actual_paths - expected_paths)
     )
+    return errors
+
+
+def verification_statuses(path: Path) -> list[str] | None:
+    text = path.read_text(encoding="utf-8")
+    _, marker, remainder = text.partition(VERIFICATION_STATUS_MARKER)
+    if not marker:
+        return None
+
+    statuses: list[str] = []
+    started = False
+    for line in remainder.splitlines():
+        if line.startswith("- "):
+            statuses.append(line[2:].strip())
+            started = True
+        elif started and line.strip():
+            break
+    return statuses
+
+
+def require_evidence_contract(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    actual_paths = yaml_mapping_paths(path)
+    if actual_paths is None:
+        return ["evidence rules missing YAML fenced block"]
+
+    expected_paths = {"evidence"} | {f"evidence.{field}" for field in EVIDENCE_FIELDS}
+    record_paths = {
+        schema_path
+        for schema_path in actual_paths
+        if schema_path == "evidence" or schema_path.startswith("evidence.")
+    }
+    actual_fields = {
+        schema_path.removeprefix("evidence.")
+        for schema_path in record_paths
+        if schema_path != "evidence"
+    }
+    expected_fields = set(EVIDENCE_FIELDS)
+    errors = [
+        f"evidence rules missing field: {field}"
+        for field in sorted(expected_fields - actual_fields)
+    ]
+    errors.extend(
+        f"evidence rules unexpected field: {field}"
+        for field in sorted(actual_fields - expected_fields)
+    )
+    errors.extend(
+        f"evidence rules unexpected path: {schema_path}"
+        for schema_path in sorted(actual_paths - expected_paths)
+        if not schema_path.startswith("evidence.")
+    )
+
+    statuses = verification_statuses(path)
+    if statuses is None or set(statuses) != set(VERIFICATION_STATUSES) or len(statuses) != len(VERIFICATION_STATUSES):
+        errors.append("evidence rules invalid verification statuses")
     return errors
 
 
@@ -273,6 +341,7 @@ def validate_package(root: Path) -> list[str]:
             EVIDENCE_RULE_TOKENS,
         )
     )
+    errors.extend(require_evidence_contract(root / "references" / "evidence-rules.md"))
     return errors
 
 

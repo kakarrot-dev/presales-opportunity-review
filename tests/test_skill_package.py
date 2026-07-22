@@ -67,3 +67,18 @@ class SkillPackageTests(unittest.TestCase):
                 "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
                 errors,
             )
+
+    def test_project_and_procurement_rules_define_routing_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profiling = root / "references" / "project-profiling.md"
+            mechanism = root / "references" / "procurement-mechanism.md"
+            profiling.parent.mkdir(parents=True)
+            profiling.write_text("# Project\n", encoding="utf-8")
+            mechanism.write_text("# Procurement\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("project rules missing token: funding_model", errors)
+            self.assertIn("procurement rules missing token: pricing_direction", errors)
+            self.assertIn("procurement rules missing token: 供应商须知前附表", errors)

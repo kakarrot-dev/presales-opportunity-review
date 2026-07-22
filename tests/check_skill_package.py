@@ -34,6 +34,32 @@ MATERIAL_RECORD_TOKENS = (
     "errors",
 )
 
+PROJECT_PROFILING_TOKENS = (
+    "project",
+    "funding_model",
+    "materials",
+    "procurement",
+    "packages",
+    "competitors",
+    "bid",
+    "strategy",
+    "evidence",
+)
+
+PROCUREMENT_MECHANISM_TOKENS = (
+    "procurement_type",
+    "funding_model",
+    "lots",
+    "joint_bid_policy",
+    "subcontract_policy",
+    "pricing_direction",
+    "quotation_rounds",
+    "evaluation_method",
+    "award_conditions",
+    "供应商须知前附表",
+    "post-award negotiation",
+)
+
 COMPANY_PROFILE_HEADINGS = (
     "## 元数据",
     "## 公司定位",
@@ -91,6 +117,20 @@ def validate_package(root: Path) -> list[str]:
             root / "knowledge" / "company-profile.md",
             "company profile",
             COMPANY_PROFILE_GUARDRAIL_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "project-profiling.md",
+            "project rules",
+            PROJECT_PROFILING_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "procurement-mechanism.md",
+            "procurement rules",
+            PROCUREMENT_MECHANISM_TOKENS,
         )
     )
     return errors

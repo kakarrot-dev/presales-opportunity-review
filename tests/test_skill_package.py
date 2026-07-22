@@ -126,6 +126,21 @@ class SkillPackageTests(unittest.TestCase):
 
             self.assertIn("capability rules missing evidence fallback relationship", errors)
 
+    def test_capability_rules_require_missing_profile_citation_fallback_relationship(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "capability-matching.md"
+            target.parent.mkdir(parents=True)
+            source = (Path(__file__).resolve().parents[1] / "references" / "capability-matching.md").read_text(encoding="utf-8")
+            target.write_text(
+                source.replace("任何 L0-L2 结论若缺少公司-profile citation，均降级为 `待内部确认`；", ""),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("capability rules missing evidence fallback relationship", errors)
+
     def test_analysis_rule_contracts_reject_missing_or_swapped_guards(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
         cases = (

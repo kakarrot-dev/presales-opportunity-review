@@ -270,6 +270,7 @@ def require_capability_definitions(path: Path) -> list[str]:
     required_relationships = (
         "`company_match` 必须引用 `knowledge/company-profile.md`",
         "公司基线为空白、过期、无法定位，或没有覆盖该能力时，输出 `待内部确认`",
+        "任何 L0-L2 结论若缺少公司-profile citation，均降级为 `待内部确认`；",
     )
     if any(relationship not in text for relationship in required_relationships):
         errors.append("capability rules missing evidence fallback relationship")

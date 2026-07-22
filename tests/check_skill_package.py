@@ -270,14 +270,41 @@ REPORT_RULE_TOKENS = (
     "正式澄清事项",
     "服务与验收关注点",
     "结论和后续建议",
-    "需求编号",
-    "原始要求和出处",
-    "响应结论",
-    "证据引用",
-    "责任人",
-    "状态",
     "verification_status",
 )
+
+INTERNAL_CLARIFICATION_FIELDS = (
+    "priority", "question", "current_judgment", "impact", "owner", "deadline",
+)
+CUSTOMER_CLARIFICATION_FIELDS = (
+    "topic", "formal_question", "reason", "response_format", "timing",
+)
+CUSTOMER_TIMING_LABELS = (
+    "投标前必须确认", "中标后可以深化", "不建议主动询问", "建议由原厂及合作伙伴确认",
+)
+REPORT_OUTPUT_FILES = (
+    "00-material-index.md", "01-opportunity-review-internal.md", "02-opportunity-review-formal.md",
+    "03-clarification-internal.md", "04-clarification-customer.md", "05-response-compliance-matrix.md",
+    "06-evidence-register.md", "project-analysis.yaml",
+)
+INTERNAL_REPORT_SECTIONS = (
+    "决策摘要", "参与建议", "项目与采购包拆解", "能力匹配", "资格和废标风险", "评审路径",
+    "隐藏工作量", "人天和报价区间", "商业模式和资金风险", "竞品生态", "投标及谈判策略",
+    "禁止承诺", "退出条件", "内部待确认事项", "行动时间表", "证据说明",
+)
+FORMAL_REPORT_SECTIONS = (
+    "项目理解", "建设目标", "需求和采购包分析", "建议技术与实施边界", "关键依赖", "工作量和周期",
+    "风险及前置条件", "正式澄清事项", "服务与验收关注点", "结论和后续建议",
+)
+FORMAL_REPORT_EXCLUSIONS = (
+    "内部底价", "能力弱项", "竞品策略", "未经验证的主张", "仅供内部审批的条件", "原始推理笔记",
+)
+COMPLIANCE_MATRIX_FIELDS = ("要求", "类型", "原文位置", "响应材料", "当前状态", "后果", "责任人")
+COMPLIANCE_TYPES = (
+    "主体与信用资格", "人员和案例证明", "保证金", "有效期", "时间节点", "签章装订", "报价", "技术响应",
+    "原厂证明", "接口", "安全", "交付", "验收", "联合体", "分包", "关联关系限制",
+)
+FORMAL_INDEPENDENT_GENERATION_RULE = "正式版必须从披露白名单独立生成，不得通过对内部版删减或删除敏感段落生成。"
 
 CAPABILITY_LEVEL_DEFINITIONS = {
     "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
@@ -352,6 +379,96 @@ def markdown_section(text: str, heading: str) -> str:
     if not marker:
         return ""
     return remainder.partition("\n## ")[0]
+
+
+def markdown_subsection(text: str, heading: str) -> str:
+    _, marker, remainder = text.partition(heading)
+    if not marker:
+        return ""
+    return re.split(r"\n#{2,3} ", remainder, maxsplit=1)[0]
+
+
+def markdown_list_items(text: str) -> tuple[str, ...]:
+    return tuple(
+        match.group(1).strip().strip("`")
+        for match in re.finditer(r"^\s*(?:- |\d+\. )(.+?)\s*$", text, re.MULTILINE)
+    )
+
+
+def markdown_table_fields(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"\|\s*`([^`]+)`\s*\|", text))
+
+
+def require_exact_values(error: str, actual: tuple[str, ...], expected: tuple[str, ...]) -> list[str]:
+    return [] if actual == expected else [error]
+
+
+def require_clarification_contract(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    errors = require_exact_values(
+        "clarification rules invalid internal fields",
+        markdown_table_fields(markdown_section(text, "## 内部待确认清单")),
+        INTERNAL_CLARIFICATION_FIELDS,
+    )
+    errors.extend(require_exact_values(
+        "clarification rules invalid customer fields",
+        markdown_table_fields(markdown_section(text, "## 甲方正式澄清清单")),
+        CUSTOMER_CLARIFICATION_FIELDS,
+    ))
+    errors.extend(require_exact_values(
+        "clarification rules invalid customer timing labels",
+        markdown_list_items(markdown_section(text, "## 甲方问题标签")),
+        CUSTOMER_TIMING_LABELS,
+    ))
+    return errors
+
+
+def require_report_contract(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    preface = text.partition("\n## ")[0]
+    errors = require_exact_values("report rules invalid output files", markdown_list_items(preface), REPORT_OUTPUT_FILES)
+    errors.extend(require_exact_values(
+        "report rules invalid internal report sections",
+        markdown_list_items(markdown_section(text, "## 01-opportunity-review-internal.md")),
+        INTERNAL_REPORT_SECTIONS,
+    ))
+    errors.extend(require_exact_values(
+        "report rules invalid formal report sections",
+        markdown_list_items(markdown_section(text, "## 02-opportunity-review-formal.md")),
+        FORMAL_REPORT_SECTIONS,
+    ))
+    if FORMAL_INDEPENDENT_GENERATION_RULE not in markdown_section(text, "## 正式报告白名单"):
+        errors.append("report rules missing formal independent generation rule")
+    whitelist = markdown_section(text, "## 正式报告白名单")
+    if any(token not in whitelist for token in FORMAL_REPORT_EXCLUSIONS):
+        errors.append("report rules invalid formal exclusions")
+    matrix = markdown_section(text, "## 05-response-compliance-matrix.md")
+    errors.extend(require_exact_values(
+        "report rules invalid compliance fields",
+        markdown_list_items(markdown_subsection(matrix, "### 字段")),
+        COMPLIANCE_MATRIX_FIELDS,
+    ))
+    errors.extend(require_exact_values(
+        "report rules invalid compliance types",
+        markdown_list_items(markdown_subsection(matrix, "### 要求类型")),
+        COMPLIANCE_TYPES,
+    ))
+    evidence = markdown_section(text, "## 06-evidence-register.md")
+    errors.extend(require_exact_values(
+        "report rules invalid evidence fields",
+        markdown_list_items(markdown_subsection(evidence, "### 字段")),
+        EVIDENCE_FIELDS,
+    ))
+    errors.extend(require_exact_values(
+        "report rules invalid evidence verification statuses",
+        markdown_list_items(markdown_subsection(evidence, "### verification_status")),
+        VERIFICATION_STATUSES,
+    ))
+    return errors
 
 
 def require_requirement_sections(path: Path) -> list[str]:
@@ -592,6 +709,7 @@ def validate_package(root: Path) -> list[str]:
             CLARIFICATION_RULE_TOKENS,
         )
     )
+    errors.extend(require_clarification_contract(root / "references" / "clarification-questions.md"))
     errors.extend(
         require_tokens(
             root / "references" / "report-template.md",
@@ -599,6 +717,7 @@ def validate_package(root: Path) -> list[str]:
             REPORT_RULE_TOKENS,
         )
     )
+    errors.extend(require_report_contract(root / "references" / "report-template.md"))
     errors.extend(
         require_tokens(
             root / "references" / "requirement-analysis.md",

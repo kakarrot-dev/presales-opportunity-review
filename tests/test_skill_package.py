@@ -97,6 +97,60 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_output_rules_reject_misplaced_fields_and_invalid_customer_timing(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "clarification-questions.md"
+            target.parent.mkdir(parents=True)
+            target.write_text(
+                (source_root / "references" / "clarification-questions.md")
+                .read_text(encoding="utf-8")
+                .replace("| `priority` |", "| `topic` |", 1)
+                .replace("| `topic` | 澄清主题 |", "| `priority` | 澄清主题 |", 1)
+                .replace("- 建议由原厂及合作伙伴确认", "- 建议由原厂及合作伙伴确认\n- 未授权的标签"),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("clarification rules invalid internal fields", errors)
+            self.assertIn("clarification rules invalid customer fields", errors)
+            self.assertIn("clarification rules invalid customer timing labels", errors)
+
+    def test_output_rules_reject_non_independent_formal_report_and_contract_drift(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "report-template.md"
+            target.parent.mkdir(parents=True)
+            target.write_text(
+                (source_root / "references" / "report-template.md")
+                .read_text(encoding="utf-8")
+                .replace("- `06-evidence-register.md`\n", "")
+                .replace("- 决策摘要\n", "")
+                .replace("- 项目理解\n", "")
+                .replace("正式版必须从披露白名单独立生成，不得通过对内部版删减或删除敏感段落生成。\n", "")
+                .replace("内部底价", "已删除", 1)
+                .replace("- 要求\n", "- 已删除字段\n", 1)
+                .replace("主体与信用资格\n", "主体与信用资格\n- 未授权类型\n")
+                .replace("- `confidence`\n", "")
+                .replace("- 无法验证\n", "- 无法验证\n- 未授权状态\n"),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("report rules invalid output files", errors)
+            self.assertIn("report rules invalid internal report sections", errors)
+            self.assertIn("report rules invalid formal report sections", errors)
+            self.assertIn("report rules missing formal independent generation rule", errors)
+            self.assertIn("report rules invalid formal exclusions", errors)
+            self.assertIn("report rules invalid compliance fields", errors)
+            self.assertIn("report rules invalid compliance types", errors)
+            self.assertIn("report rules invalid evidence fields", errors)
+            self.assertIn("report rules invalid evidence verification statuses", errors)
+
     def test_output_rules_require_two_clarification_sets_and_disclosure_allowlist(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

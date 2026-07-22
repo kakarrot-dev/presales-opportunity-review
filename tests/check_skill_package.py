@@ -48,6 +48,10 @@ COMPANY_PROFILE_HEADINGS = (
     "## 报价参考",
 )
 
+COMPANY_PROFILE_GUARDRAIL_TOKENS = (
+    "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
+)
+
 
 def require_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
     if not path.is_file():
@@ -80,6 +84,13 @@ def validate_package(root: Path) -> list[str]:
             root / "knowledge" / "company-profile.md",
             "company profile",
             COMPANY_PROFILE_HEADINGS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "knowledge" / "company-profile.md",
+            "company profile",
+            COMPANY_PROFILE_GUARDRAIL_TOKENS,
         )
     )
     return errors

@@ -34,3 +34,36 @@ class SkillPackageTests(unittest.TestCase):
 
             self.assertIn("material rules missing token: parse_confidence", errors)
             self.assertIn("company profile missing heading: ## 能力边界", errors)
+
+    def test_company_profile_requires_missing_baseline_blocking_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "knowledge" / "company-profile.md"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "\n".join(
+                    (
+                        "# 公司能力基线",
+                        "## 元数据",
+                        "## 公司定位",
+                        "## 产品能力",
+                        "## 技术能力",
+                        "## 交付能力",
+                        "## 商务原则",
+                        "## 能力边界",
+                        "## L0-L3 判定基线",
+                        "## 历史案例",
+                        "## 工作量参考",
+                        "## 报价参考",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn(
+                "company profile missing token: "
+                "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
+                errors,
+            )

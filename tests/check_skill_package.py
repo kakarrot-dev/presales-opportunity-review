@@ -174,13 +174,18 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
 
 
-def yaml_mapping_paths(path: Path) -> set[str] | None:
-    """Parse the constrained schema block without depending on a YAML package."""
+def yaml_mapping_paths(path: Path) -> dict[str, int] | None:
+    """Parse constrained schema paths while retaining duplicate-key counts."""
     match = YAML_FENCE.search(path.read_text(encoding="utf-8"))
     if match is None:
         return None
 
-    paths: set[str] = set()
+    paths: dict[str, int] = {}
+
+    def add_path(key_path: tuple[str, ...]) -> None:
+        schema_path = ".".join(key_path)
+        paths[schema_path] = paths.get(schema_path, 0) + 1
+
     parents: list[tuple[int, tuple[str, ...]]] = []
     for line in match.group("body").splitlines():
         mapping = YAML_MAPPING_LINE.match(line)
@@ -191,11 +196,11 @@ def yaml_mapping_paths(path: Path) -> set[str] | None:
             parents.pop()
         parent_path = parents[-1][1] if parents else ()
         key_path = parent_path + (mapping.group("key"),)
-        paths.add(".".join(key_path))
+        add_path(key_path)
         value = mapping.group("value").strip()
         if value.startswith("{"):
             for flow_key in FLOW_MAPPING_KEY.findall(value[1:]):
-                paths.add(".".join(key_path + (flow_key,)))
+                add_path(key_path + (flow_key,))
         elif not value:
             parents.append((indent, key_path))
     return paths
@@ -204,9 +209,10 @@ def yaml_mapping_paths(path: Path) -> set[str] | None:
 def require_project_schema(path: Path) -> list[str]:
     if not path.is_file():
         return []
-    actual_paths = yaml_mapping_paths(path)
-    if actual_paths is None:
+    actual_path_counts = yaml_mapping_paths(path)
+    if actual_path_counts is None:
         return ["project schema missing YAML fenced block"]
+    actual_paths = set(actual_path_counts)
     expected_paths = set(PROJECT_SCHEMA_PATHS)
     errors = [
         f"project schema missing path: {schema_path}"
@@ -239,9 +245,10 @@ def verification_statuses(path: Path) -> list[str] | None:
 def require_evidence_contract(path: Path) -> list[str]:
     if not path.is_file():
         return []
-    actual_paths = yaml_mapping_paths(path)
-    if actual_paths is None:
+    actual_path_counts = yaml_mapping_paths(path)
+    if actual_path_counts is None:
         return ["evidence rules missing YAML fenced block"]
+    actual_paths = set(actual_path_counts)
 
     expected_paths = {"evidence"} | {f"evidence.{field}" for field in EVIDENCE_FIELDS}
     record_paths = {
@@ -262,6 +269,11 @@ def require_evidence_contract(path: Path) -> list[str]:
     errors.extend(
         f"evidence rules unexpected field: {field}"
         for field in sorted(actual_fields - expected_fields)
+    )
+    errors.extend(
+        f"evidence rules duplicate field: {schema_path.removeprefix('evidence.')}"
+        for schema_path, count in sorted(actual_path_counts.items())
+        if schema_path.startswith("evidence.") and count > 1
     )
     errors.extend(
         f"evidence rules unexpected path: {schema_path}"

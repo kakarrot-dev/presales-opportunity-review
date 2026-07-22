@@ -251,6 +251,9 @@ def require_evidence_contract(path: Path) -> list[str]:
     actual_paths = set(actual_path_counts)
 
     expected_paths = {"evidence"} | {f"evidence.{field}" for field in EVIDENCE_FIELDS}
+    errors: list[str] = []
+    if actual_path_counts.get("evidence", 0) > 1:
+        errors.append("evidence rules duplicate root: evidence")
     record_paths = {
         schema_path
         for schema_path in actual_paths
@@ -262,10 +265,10 @@ def require_evidence_contract(path: Path) -> list[str]:
         if schema_path != "evidence"
     }
     expected_fields = set(EVIDENCE_FIELDS)
-    errors = [
+    errors.extend(
         f"evidence rules missing field: {field}"
         for field in sorted(expected_fields - actual_fields)
-    ]
+    )
     errors.extend(
         f"evidence rules unexpected field: {field}"
         for field in sorted(actual_fields - expected_fields)

@@ -68,6 +68,7 @@ EVIDENCE_FIELDS = {
     "confidence",
 }
 
+
 def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
     records: list[dict[str, str | list[str]]] = []
     current: dict[str, str | list[str]] | None = None
@@ -81,6 +82,8 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
             list_key = None
         elif current is not None and line.startswith("    ") and ":" in line:
             key, value = line.strip().split(":", 1)
+            if key in current:
+                raise ValueError(f"duplicate fixture field: {key}")
             current[key] = [] if value.strip() in ("", "[]") else value.strip().strip('"')
             list_key = key if not value.strip() else None
         elif current is not None and list_key and line.startswith("      - "):
@@ -335,6 +338,29 @@ evidence: []
 
             self.assertIn("evidence rules duplicate field: claim", errors)
 
+    def test_evidence_rules_reject_duplicate_evidence_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "references" / "evidence-rules.md"
+            evidence.parent.mkdir(parents=True)
+            source = (
+                Path(__file__).resolve().parents[1]
+                / "references"
+                / "evidence-rules.md"
+            )
+            evidence.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    "evidence:\n",
+                    "evidence:\nevidence:\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("evidence rules duplicate root: evidence", errors)
+
     def test_research_rules_require_explicit_unverified_status_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -387,6 +413,17 @@ evidence: []
             {source for record in syndication for source in record["independent_sources"]},
             {"示例采购方新闻稿"},
         )
+        self.assertEqual(
+            [record["independent_sources"] for record in syndication],
+            [["示例采购方新闻稿"], ["示例采购方新闻稿"]],
+        )
+        degraded_origins = [record["independent_sources"] for record in syndication]
+        degraded_origins[1] = []
+        with self.assertRaises(AssertionError):
+            self.assertEqual(
+                degraded_origins,
+                [["示例采购方新闻稿"], ["示例采购方新闻稿"]],
+            )
         self.assertEqual(conflict_status, "来源冲突")
         self.assertEqual(len(conflict), 2)
         self.assertEqual({record["verification_status"] for record in conflict}, {conflict_status})
@@ -403,3 +440,24 @@ evidence: []
             },
         )
         self.assertTrue(all(record["contradictions"] for record in conflict))
+
+    def test_fixture_parser_rejects_duplicate_record_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "evidence.yaml"
+            source = (
+                Path(__file__).parent
+                / "fixtures"
+                / "invalid-syndication"
+                / "evidence.yaml"
+            )
+            path.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    '    source: "示例行业媒体甲"\n',
+                    '    source: "示例行业媒体甲"\n    source: "重复媒体"\n',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "duplicate fixture field: source"):
+                fixture_records(path)

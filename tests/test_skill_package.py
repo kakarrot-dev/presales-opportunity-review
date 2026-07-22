@@ -97,6 +97,35 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_requirement_rules_reject_tokens_deleted_only_from_required_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "requirement-analysis.md"
+            target.parent.mkdir(parents=True)
+            source = (Path(__file__).resolve().parents[1] / "references" / "requirement-analysis.md").read_text(encoding="utf-8")
+            before, heading, remainder = source.partition("## 原子需求记录")
+            section, next_heading, after = remainder.partition("## 拆分方法")
+            target.write_text(before + heading + section.replace("数据", "已删除") + next_heading + after, encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("requirement rules missing 原子需求记录 token: 数据", errors)
+
+    def test_capability_rules_require_missing_evidence_fallback_relationship(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "references" / "capability-matching.md"
+            target.parent.mkdir(parents=True)
+            source = (Path(__file__).resolve().parents[1] / "references" / "capability-matching.md").read_text(encoding="utf-8")
+            target.write_text(
+                source.replace("公司基线为空白、过期、无法定位，或没有覆盖该能力时，输出 `待内部确认`", "公司基线缺少时需要补充"),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("capability rules missing evidence fallback relationship", errors)
+
     def test_analysis_rule_contracts_reject_missing_or_swapped_guards(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
         cases = (

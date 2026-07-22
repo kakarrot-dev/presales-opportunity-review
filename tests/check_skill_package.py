@@ -187,6 +187,12 @@ THREE_POINT_ESTIMATE_TOKENS = (
     "风险储备",
 )
 
+ATOMIC_REQUIREMENT_TOKENS = (
+    "原始要求和出处", "交付物", "依赖", "验收", "隐含工作", "能力匹配",
+    "复杂度", "工作量", "风险", "澄清", "数据", "接口",
+)
+HIDDEN_WORK_TOKENS = ("数据", "接口", "部署", "迁移", "定制", "测试", "培训", "现场服务", "质保", "验收")
+
 EVIDENCE_FIELDS = (
     "id",
     "claim",
@@ -232,15 +238,42 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
 
 
+def markdown_section(text: str, heading: str) -> str:
+    _, marker, remainder = text.partition(heading)
+    if not marker:
+        return ""
+    return remainder.partition("\n## ")[0]
+
+
+def require_requirement_sections(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    sections = (("原子需求记录", ATOMIC_REQUIREMENT_TOKENS), ("隐性工作清单", HIDDEN_WORK_TOKENS))
+    return [
+        f"requirement rules missing {heading} token: {token}"
+        for heading, tokens in sections
+        for token in tokens
+        if token not in markdown_section(text, f"## {heading}")
+    ]
+
+
 def require_capability_definitions(path: Path) -> list[str]:
     if not path.is_file():
         return []
     text = path.read_text(encoding="utf-8")
-    return [
+    errors = [
         f"capability rules invalid definition: {level}"
         for level, definition in CAPABILITY_LEVEL_DEFINITIONS.items()
         if f"`{level}`：{definition}" not in text
     ]
+    required_relationships = (
+        "`company_match` 必须引用 `knowledge/company-profile.md`",
+        "公司基线为空白、过期、无法定位，或没有覆盖该能力时，输出 `待内部确认`",
+    )
+    if any(relationship not in text for relationship in required_relationships):
+        errors.append("capability rules missing evidence fallback relationship")
+    return errors
 
 
 def require_estimation_section_tokens(path: Path, heading: str) -> list[str]:
@@ -449,6 +482,7 @@ def validate_package(root: Path) -> list[str]:
             REQUIREMENT_ANALYSIS_TOKENS,
         )
     )
+    errors.extend(require_requirement_sections(root / "references" / "requirement-analysis.md"))
     errors.extend(
         require_tokens(
             root / "references" / "capability-matching.md",

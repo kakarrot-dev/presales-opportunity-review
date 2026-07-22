@@ -97,6 +97,22 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_analysis_modules_define_atomic_requirements_and_three_point_estimates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            references = root / "references"
+            references.mkdir(parents=True)
+            (references / "requirement-analysis.md").write_text("# Requirements\n", encoding="utf-8")
+            (references / "capability-matching.md").write_text("# Capability\n", encoding="utf-8")
+            (references / "effort-estimation.md").write_text("# Effort\n", encoding="utf-8")
+
+            errors = validate_package(root)
+
+            self.assertIn("requirement rules missing token: 原始要求和出处", errors)
+            self.assertIn("capability rules missing token: L3 不建议承诺", errors)
+            self.assertIn("effort rules missing token: 乐观", errors)
+            self.assertIn("effort rules missing token: 最坏情景损失", errors)
+
     def test_minimal_package_requires_all_references(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

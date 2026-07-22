@@ -129,6 +129,19 @@ EVIDENCE_RULE_TOKENS = (
     "不能作为正式报告的确定性事实",
 )
 
+REQUIREMENT_ANALYSIS_TOKENS = (
+    "原始要求和出处",
+)
+
+CAPABILITY_MATCHING_TOKENS = (
+    "L3 不建议承诺",
+)
+
+EFFORT_ESTIMATION_TOKENS = (
+    "乐观",
+    "最坏情景损失",
+)
+
 EVIDENCE_FIELDS = (
     "id",
     "claim",
@@ -357,6 +370,27 @@ def validate_package(root: Path) -> list[str]:
         )
     )
     errors.extend(require_evidence_contract(root / "references" / "evidence-rules.md"))
+    errors.extend(
+        require_tokens(
+            root / "references" / "requirement-analysis.md",
+            "requirement rules",
+            REQUIREMENT_ANALYSIS_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "capability-matching.md",
+            "capability rules",
+            CAPABILITY_MATCHING_TOKENS,
+        )
+    )
+    errors.extend(
+        require_tokens(
+            root / "references" / "effort-estimation.md",
+            "effort rules",
+            EFFORT_ESTIMATION_TOKENS,
+        )
+    )
     return errors
 
 

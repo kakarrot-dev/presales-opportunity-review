@@ -163,3 +163,29 @@ class SkillPackageTests(unittest.TestCase):
 
             self.assertIn("project schema missing path: strategy.pricing", errors)
             self.assertIn("project schema unexpected path: pricing", errors)
+
+    def test_procurement_precedence_rejects_swapped_levels(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mechanism = root / "references" / "procurement-mechanism.md"
+            mechanism.parent.mkdir(parents=True)
+            mechanism.write_text(
+                "\n".join(
+                    (
+                        "procurement_type funding_model lots joint_bid_policy subcontract_policy",
+                        "pricing_direction quotation_rounds evaluation_method award_conditions",
+                        "供应商须知前附表 post-award negotiation",
+                        "latest clarification/modification",
+                        "> special terms",
+                        "> supplier instructions schedule",
+                        "> procurement requirements",
+                        "> general terms",
+                        "> response template",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("procurement rules invalid precedence order", errors)

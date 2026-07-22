@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 
@@ -46,52 +47,24 @@ PROJECT_PROFILING_TOKENS = (
     "evidence",
 )
 
-PROJECT_SCHEMA_TOKENS = (
+PROJECT_SCHEMA_PATHS = (
     "project",
-    "name",
-    "customer",
-    "industry",
-    "procurement_type",
-    "funding_model",
-    "current_stage",
-    "budget",
-    "delivery_scope",
-    "timeline",
-    "materials",
-    "provided",
-    "missing",
-    "parse_failures",
-    "conflicts",
-    "confidence",
-    "procurement",
-    "lots",
-    "joint_bid_policy",
-    "subcontract_policy",
-    "pricing_direction",
-    "quotation_rounds",
-    "evaluation_method",
-    "award_conditions",
-    "rule_conflicts",
+    "project.name", "project.customer", "project.industry", "project.procurement_type",
+    "project.funding_model", "project.current_stage", "project.budget",
+    "project.delivery_scope", "project.timeline",
+    "materials", "materials.provided", "materials.missing", "materials.parse_failures",
+    "materials.conflicts", "materials.confidence",
+    "procurement", "procurement.lots", "procurement.joint_bid_policy",
+    "procurement.subcontract_policy", "procurement.pricing_direction",
+    "procurement.quotation_rounds", "procurement.evaluation_method",
+    "procurement.award_conditions", "procurement.rule_conflicts",
     "packages",
-    "competitors",
-    "direct",
-    "substitutes",
-    "partners",
-    "bid",
-    "qualification_items",
-    "compliance_items",
-    "rejection_risks",
-    "scoring_items",
-    "estimated_score",
-    "strategy",
-    "recommendation",
-    "participation_mode",
-    "conditions",
-    "exit_conditions",
-    "prohibited_commitments",
-    "pricing",
-    "negotiation",
-    "clarification_questions",
+    "competitors", "competitors.direct", "competitors.substitutes", "competitors.partners",
+    "bid", "bid.qualification_items", "bid.compliance_items", "bid.rejection_risks",
+    "bid.scoring_items", "bid.estimated_score",
+    "strategy", "strategy.recommendation", "strategy.participation_mode",
+    "strategy.conditions", "strategy.exit_conditions", "strategy.prohibited_commitments",
+    "strategy.pricing", "strategy.negotiation", "strategy.clarification_questions",
     "evidence",
 )
 
@@ -136,6 +109,12 @@ COMPANY_PROFILE_GUARDRAIL_TOKENS = (
     "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
 )
 
+YAML_FENCE = re.compile(r"```yaml\s*\n(?P<body>.*?)```", re.DOTALL)
+YAML_MAPPING_LINE = re.compile(
+    r"^(?P<indent>[ ]*)(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?P<value>.*)$"
+)
+FLOW_MAPPING_KEY = re.compile(r"(?:^|,)\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:")
+
 
 def require_tokens(path: Path, label: str, tokens: tuple[str, ...]) -> list[str]:
     if not path.is_file():
@@ -149,6 +128,51 @@ def require_headings(path: Path, label: str, headings: tuple[str, ...]) -> list[
         return []
     text = path.read_text(encoding="utf-8")
     return [f"{label} missing heading: {heading}" for heading in headings if heading not in text]
+
+
+def yaml_mapping_paths(path: Path) -> set[str] | None:
+    """Parse the constrained schema block without depending on a YAML package."""
+    match = YAML_FENCE.search(path.read_text(encoding="utf-8"))
+    if match is None:
+        return None
+
+    paths: set[str] = set()
+    parents: list[tuple[int, tuple[str, ...]]] = []
+    for line in match.group("body").splitlines():
+        mapping = YAML_MAPPING_LINE.match(line)
+        if mapping is None:
+            continue
+        indent = len(mapping.group("indent"))
+        while parents and indent <= parents[-1][0]:
+            parents.pop()
+        parent_path = parents[-1][1] if parents else ()
+        key_path = parent_path + (mapping.group("key"),)
+        paths.add(".".join(key_path))
+        value = mapping.group("value").strip()
+        if value.startswith("{"):
+            for flow_key in FLOW_MAPPING_KEY.findall(value[1:]):
+                paths.add(".".join(key_path + (flow_key,)))
+        elif not value:
+            parents.append((indent, key_path))
+    return paths
+
+
+def require_project_schema(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    actual_paths = yaml_mapping_paths(path)
+    if actual_paths is None:
+        return ["project schema missing YAML fenced block"]
+    expected_paths = set(PROJECT_SCHEMA_PATHS)
+    errors = [
+        f"project schema missing path: {schema_path}"
+        for schema_path in sorted(expected_paths - actual_paths)
+    ]
+    errors.extend(
+        f"project schema unexpected path: {schema_path}"
+        for schema_path in sorted(actual_paths - expected_paths)
+    )
+    return errors
 
 
 def require_precedence(path: Path) -> list[str]:
@@ -194,13 +218,7 @@ def validate_package(root: Path) -> list[str]:
             PROJECT_PROFILING_TOKENS,
         )
     )
-    errors.extend(
-        require_tokens(
-            root / "references" / "project-profiling.md",
-            "project schema",
-            PROJECT_SCHEMA_TOKENS,
-        )
-    )
+    errors.extend(require_project_schema(root / "references" / "project-profiling.md"))
     errors.extend(
         require_tokens(
             root / "references" / "procurement-mechanism.md",

@@ -5,6 +5,56 @@ from pathlib import Path
 from check_skill_package import validate_package
 
 
+PROJECT_SCHEMA = """```yaml
+project:
+  name: null
+  customer: null
+  industry: null
+  procurement_type: null
+  funding_model: null
+  current_stage: null
+  budget: null
+  delivery_scope: null
+  timeline: null
+materials:
+  provided: []
+  missing: []
+  parse_failures: []
+  conflicts: []
+  confidence: null
+procurement:
+  lots: []
+  joint_bid_policy: null
+  subcontract_policy: null
+  pricing_direction: null
+  quotation_rounds: []
+  evaluation_method: null
+  award_conditions: []
+  rule_conflicts: []
+packages: []
+competitors:
+  direct: []
+  substitutes: []
+  partners: []
+bid:
+  qualification_items: []
+  compliance_items: []
+  rejection_risks: []
+  scoring_items: []
+  estimated_score: null
+strategy:
+  recommendation: null
+  participation_mode: null
+  conditions: []
+  exit_conditions: []
+  prohibited_commitments: []
+  pricing: null
+  negotiation: null
+  clarification_questions: []
+evidence: []
+```"""
+
+
 class SkillPackageTests(unittest.TestCase):
     def test_minimal_package_requires_all_references(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -83,49 +133,33 @@ class SkillPackageTests(unittest.TestCase):
             self.assertIn("procurement rules missing token: pricing_direction", errors)
             self.assertIn("procurement rules missing token: 供应商须知前附表", errors)
 
-    def test_project_schema_and_procurement_precedence_are_complete(self) -> None:
+    def test_project_schema_reports_missing_nested_strategy_pricing(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             profiling = root / "references" / "project-profiling.md"
-            mechanism = root / "references" / "procurement-mechanism.md"
             profiling.parent.mkdir(parents=True)
             profiling.write_text(
-                "\n".join(
-                    (
-                        "project: {name: null, customer: null, industry: null, procurement_type: null, funding_model: null, current_stage: null, budget: null, delivery_scope: null, timeline: null}",
-                        "materials: {provided: [], missing: [], confidence: null}",
-                        "procurement: {lots: [], joint_bid_policy: null, subcontract_policy: null, pricing_direction: null, quotation_rounds: [], evaluation_method: null, award_conditions: []}",
-                        "packages: []",
-                        "competitors: {direct: [], substitutes: [], partners: []}",
-                        "bid: {qualification_items: [], compliance_items: [], rejection_risks: [], scoring_items: [], estimated_score: null}",
-                        "strategy: {recommendation: null, participation_mode: null, conditions: [], exit_conditions: [], pricing: null, negotiation: null, clarification_questions: []}",
-                        "evidence: []",
-                    )
-                ),
+                PROJECT_SCHEMA.replace("  pricing: null\n", "", 1),
                 encoding="utf-8",
             )
-            mechanism.write_text(
-                "\n".join(
-                    (
-                        "procurement_type funding_model lots joint_bid_policy subcontract_policy",
-                        "pricing_direction quotation_rounds evaluation_method award_conditions",
-                        "供应商须知前附表 post-award negotiation",
-                        "latest clarification/modification",
-                        "> special terms",
-                        "> supplier instructions schedule",
-                        "> procurement requirements",
-                        "> general terms",
-                        "> response template",
-                    )
+
+            errors = validate_package(root)
+
+            self.assertIn("project schema missing path: strategy.pricing", errors)
+
+    def test_project_schema_rejects_field_under_wrong_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profiling = root / "references" / "project-profiling.md"
+            profiling.parent.mkdir(parents=True)
+            profiling.write_text(
+                PROJECT_SCHEMA.replace("  pricing: null\n", "").replace(
+                    "evidence: []", "pricing: null\nevidence: []"
                 ),
                 encoding="utf-8",
             )
 
             errors = validate_package(root)
 
-            self.assertIn("project schema missing token: parse_failures", errors)
-            self.assertIn("project schema missing token: rule_conflicts", errors)
-            self.assertIn(
-                "project schema missing token: prohibited_commitments", errors
-            )
-            self.assertIn("procurement rules invalid precedence order", errors)
+            self.assertIn("project schema missing path: strategy.pricing", errors)
+            self.assertIn("project schema unexpected path: pricing", errors)

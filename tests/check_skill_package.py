@@ -449,6 +449,9 @@ SAMPLE_REPORT_TOKENS = (
     "| 公司基线 | FAIL |",
 )
 
+MATERIAL_FORMATS = ("xlsx", "docx", "pdf", "markdown", "image", "other")
+FORMAL_EVIDENCE_STATUSES = ("已由一手来源确认", "已交叉验证")
+
 FORMAL_EVIDENCE_GATE_RULE = (
     "只有 `已由一手来源确认` 或 `已交叉验证` 能支持正式报告中的确定性事实；"
     "`单一来源待验证`、`来源冲突` 和 `无法验证` 均禁止作为正式确定事实。"
@@ -796,6 +799,14 @@ def markdown_table_rows(section: str) -> list[list[str]]:
     return rows
 
 
+def markdown_table_records(section: str) -> list[dict[str, str]]:
+    rows = markdown_table_rows(section)
+    if not rows:
+        return []
+    header = rows[0]
+    return [dict(zip(header, row)) for row in rows[1:] if len(row) == len(header)]
+
+
 def require_sample_report_semantics(path: Path) -> list[str]:
     if not path.is_file():
         return []
@@ -839,6 +850,9 @@ def require_sample_report_semantics(path: Path) -> list[str]:
 
     material_rows = markdown_table_rows(markdown_section(text, "## 材料索引"))
     material_by_id = {row[0]: row for row in material_rows if row}
+    for row in material_rows[1:]:
+        if len(row) >= 3 and row[2] not in MATERIAL_FORMATS:
+            errors.append(f"sample report invalid material format: {row[0]}={row[2]}")
     if "M001" not in material_by_id or "M001-S01" not in material_by_id:
         errors.append("sample report missing workbook/sheet records: M001 and M001-S01")
     empty_sheet = material_by_id.get("M001-S02", [])
@@ -850,6 +864,34 @@ def require_sample_report_semantics(path: Path) -> list[str]:
     quality_header = quality_rows[0] if quality_rows else []
     if "责任人" not in quality_header:
         errors.append("sample report quality gate missing owner column")
+    else:
+        owner_index = quality_header.index("责任人")
+        for row in quality_rows[1:]:
+            if len(row) <= owner_index or not row[owner_index]:
+                gate = row[0] if row else "unknown"
+                errors.append(f"sample report quality gate missing owner: {gate}")
+
+    evidence_records = {
+        record.get("id", ""): record
+        for record in markdown_table_records(markdown_section(text, "## 证据登记摘要"))
+        if record.get("id")
+    }
+    formal_excerpt = markdown_section(text, "## 正式报告摘录")
+    referenced_evidence = set(re.findall(r"\[(E\d+)\]", formal_excerpt))
+    if not referenced_evidence:
+        errors.append("sample formal excerpt missing evidence citation")
+    rejected_evidence: set[str] = set()
+    for evidence_id, record in evidence_records.items():
+        status = record.get("verification_status", "")
+        claim = record.get("claim", "")
+        if status not in FORMAL_EVIDENCE_STATUSES and (
+            evidence_id in referenced_evidence or (claim and claim in formal_excerpt)
+        ):
+            rejected_evidence.add(evidence_id)
+    for evidence_id in sorted(rejected_evidence):
+        errors.append(f"sample formal excerpt uses non-formal evidence: {evidence_id}")
+    for evidence_id in sorted(referenced_evidence - set(evidence_records)):
+        errors.append(f"sample formal excerpt references unknown evidence: {evidence_id}")
     return errors
 
 

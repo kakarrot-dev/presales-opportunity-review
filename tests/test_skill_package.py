@@ -97,6 +97,66 @@ def fixture_records(path: Path) -> tuple[list[dict[str, str | list[str]]], str]:
 
 
 class SkillPackageTests(unittest.TestCase):
+    def test_checker_rejects_invalid_sample_material_format(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace(
+                    "| M001-S01 | 虚构采购清单.xlsx#采购清单 | xlsx |",
+                    "| M001-S01 | 虚构采购清单.xlsx#采购清单 | xlsx-sheet |",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report invalid material format: M001-S01=xlsx-sheet", errors)
+
+    def test_checker_rejects_non_formal_evidence_leaked_into_formal_excerpt(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace(
+                    "## 正式报告摘录\n",
+                    "## 正式报告摘录\n\n项目已启动。[E002]\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample formal excerpt uses non-formal evidence: E002", errors)
+
+    def test_checker_rejects_empty_quality_gate_owner(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "examples" / "sample-report.md"
+            report.parent.mkdir(parents=True)
+            source = (source_root / "examples" / "sample-report.md").read_text(encoding="utf-8")
+            report.write_text(
+                source.replace(
+                    "| 公司基线 | FAIL | 能力、工作量和报价基线过期 | 公司基线负责人 |",
+                    "| 公司基线 | FAIL | 能力、工作量和报价基线过期 |  |",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("sample report quality gate missing owner: 公司基线", errors)
+
     def test_checker_rejects_drift_from_the_approved_19_stage_workflow(self) -> None:
         approved_stages = (
             "接收用户材料", "枚举并识别有效内容", "读取公司能力基线", "建立项目画像",

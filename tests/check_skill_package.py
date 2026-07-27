@@ -21,8 +21,10 @@ REQUIRED_FILES = (
     "references/clarification-questions.md",
     "references/evidence-rules.md",
     "references/report-template.md",
+    "templates/opportunity-review-report.html",
     "examples/sample-input.md",
     "examples/sample-report.md",
+    "examples/sample-report.html",
 )
 
 MATERIAL_RECORD_TOKENS = (
@@ -117,6 +119,22 @@ COMPANY_PROFILE_HEADINGS = (
 
 COMPANY_PROFILE_GUARDRAIL_TOKENS = (
     "公司基线缺失时，不得给出确定性的能力匹配、报价和参与建议",
+)
+COMPANY_PROFILE_CURRENT_TOKENS = (
+    "郑州零之度信息技术有限公司",
+    "李虎",
+    "侯小鹏",
+    "张燕平",
+    "2 个产品经理",
+    "4 个研发",
+    "2 个售前销售",
+    "尚未形成成熟产品",
+    "2027 年春节前实现净利润 60 万元",
+    "ORG-001",
+    "TEAM-001",
+    "PRODUCT-001",
+    "TARGET-001",
+    "待工商材料核验",
 )
 
 COMPANY_PROFILE_METADATA_FIELDS = ("更新时间", "维护人", "可信度")
@@ -259,6 +277,8 @@ REPORT_RULE_TOKENS = (
     "05-response-compliance-matrix.md",
     "06-evidence-register.md",
     "project-analysis.yaml",
+    "01-opportunity-review-internal.html",
+    "02-opportunity-review-formal.html",
     "白名单",
     "内部底价",
     "能力弱项",
@@ -307,7 +327,8 @@ CUSTOMER_TIMING_LABELS = (
 REPORT_OUTPUT_FILES = (
     "00-material-index.md", "01-opportunity-review-internal.md", "02-opportunity-review-formal.md",
     "03-clarification-internal.md", "04-clarification-customer.md", "05-response-compliance-matrix.md",
-    "06-evidence-register.md", "project-analysis.yaml",
+    "06-evidence-register.md", "project-analysis.yaml", "01-opportunity-review-internal.html",
+    "02-opportunity-review-formal.html",
 )
 INTERNAL_REPORT_SECTIONS = (
     "决策摘要", "参与建议", "项目与采购包拆解", "能力匹配", "资格和废标风险", "评审路径",
@@ -331,8 +352,25 @@ COMPLIANCE_TYPES = (
     "原厂证明", "接口", "安全", "交付", "验收", "联合体", "分包", "关联关系限制",
 )
 FORMAL_INDEPENDENT_GENERATION_RULE = "正式版必须从披露白名单独立生成，不得通过对内部版删减或删除敏感段落生成。"
-FORMAL_ALLOWLIST_RULE = "`02-opportunity-review-formal.md`、`04-clarification-customer.md` 和对甲方交付的响应片段只能使用披露白名单中的允许项。"
+FORMAL_ALLOWLIST_RULE = "`02-opportunity-review-formal.md`、`02-opportunity-review-formal.html`、`04-clarification-customer.md` 和对甲方交付的响应片段只能使用披露白名单中的允许项。"
 FORMAL_PROHIBITION_RULE = "正式版严禁包含以下内容："
+CLAUDE_CREAM_HTML_TOKENS = {
+    "--cc-primary": "#b7791f",
+    "--cc-primary-active": "#9f6819",
+    "--cc-text-accent": "#8a5a12",
+    "--cc-ink": "#29271d",
+    "--cc-body": "#403d36",
+    "--cc-muted": "#6d675b",
+    "--cc-hairline": "#d8d2c3",
+    "--cc-canvas": "#f5f3e9",
+    "--cc-surface": "#ffffff",
+    "--cc-surface-soft": "#f8f7f2",
+    "--cc-surface-dark": "#2a2b2a",
+    "--cc-teal": "#2c6f75",
+    "--cc-success": "#4b6f3d",
+    "--cc-warning": "#8a5e16",
+    "--cc-error": "#7c1b13",
+}
 
 CAPABILITY_LEVEL_DEFINITIONS = {
     "L0 直接满足": "现有产品、技术或交付能力可在约定范围内直接满足",
@@ -678,6 +716,39 @@ def require_report_contract(path: Path) -> list[str]:
         markdown_list_items(markdown_subsection(evidence, "### verification_status")),
         VERIFICATION_STATUSES,
     ))
+    return errors
+
+
+def require_html_report_contract(template_path: Path, sample_path: Path) -> list[str]:
+    errors: list[str] = []
+    if template_path.is_file():
+        text = template_path.read_text(encoding="utf-8")
+        for token, value in CLAUDE_CREAM_HTML_TOKENS.items():
+            if f"{token}: {value};" not in text:
+                errors.append(f"HTML template invalid Claude Cream token: {token}")
+        if "@media print" not in text:
+            errors.append("HTML template missing print stylesheet")
+        if 'data-report-visibility="{{REPORT_VISIBILITY}}"' not in text:
+            errors.append("HTML template missing report visibility marker")
+        if "window.print()" not in text:
+            errors.append("HTML template missing print action")
+        if "font-family: var(--cc-font-body)" not in text:
+            errors.append("HTML template must use Claude Cream font stack")
+        if re.search(r"""(?:src|href)=["']https?://""", text):
+            errors.append("HTML template must be self-contained")
+        for required in (
+            "<!doctype html>", 'lang="zh-CN"', 'name="viewport"', 'href="#main-content"',
+            "prefers-reduced-motion", "color-scheme", "{{REPORT_TITLE}}", "{{REPORT_SECTIONS}}",
+        ):
+            if required.lower() not in text.lower():
+                errors.append(f"HTML template missing token: {required}")
+
+    if sample_path.is_file():
+        text = sample_path.read_text(encoding="utf-8")
+        if 'data-report-visibility="formal"' in text:
+            for forbidden in FORMAL_REPORT_EXCLUSIONS:
+                if forbidden in text:
+                    errors.append(f"sample formal HTML contains forbidden content: {forbidden}")
     return errors
 
 
@@ -1171,6 +1242,13 @@ def validate_package(root: Path) -> list[str]:
             COMPANY_PROFILE_GUARDRAIL_TOKENS,
         )
     )
+    errors.extend(
+        require_tokens(
+            root / "knowledge" / "company-profile.md",
+            "company profile current baseline",
+            COMPANY_PROFILE_CURRENT_TOKENS,
+        )
+    )
     errors.extend(require_company_profile_contract(root / "knowledge" / "company-profile.md"))
     errors.extend(
         require_tokens(
@@ -1219,6 +1297,10 @@ def validate_package(root: Path) -> list[str]:
         )
     )
     errors.extend(require_report_contract(root / "references" / "report-template.md"))
+    errors.extend(require_html_report_contract(
+        root / "templates" / "opportunity-review-report.html",
+        root / "examples" / "sample-report.html",
+    ))
     errors.extend(
         require_tokens(
             root / "references" / "requirement-analysis.md",

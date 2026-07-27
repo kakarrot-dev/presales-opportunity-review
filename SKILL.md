@@ -46,7 +46,7 @@ description: Analyze heterogeneous tender and opportunity materials for presales
 15. **阶段 15：人天/周期/报价区间**：按 `references/effort-estimation.md` 输出三点人天、人员、周期和报价区间，附假设、不含项和风险储备；未获授权时仅保留内部估算。
 16. **阶段 16：参与模式和成立条件**：按 `references/opportunity-strategy.md` 输出推荐、参与身份、成立条件、退出条件和禁止承诺，不用 Conditional Go 弱化 No-Go 或信息不足门槛。
 17. **阶段 17：两套澄清清单**：按 `references/clarification-questions.md` 分别生成内部待确认清单和甲方正式澄清清单，两者不混用字段或敏感信息。
-18. **阶段 18：内部版和正式版**：按 `references/report-template.md` 生成完整内部版；仅从披露白名单独立生成正式版和甲方澄清，不通过删减内部报告生成。
+18. **阶段 18：内部版和正式版**：按 `references/report-template.md` 先生成完整内部版 Markdown 与 HTML；仅从披露白名单独立生成正式版 Markdown、HTML 和甲方澄清，不通过删减、DOM 隐藏或浏览器脚本处理内部报告生成正式版。
 19. **阶段 19：证据/矛盾/完整性/敏感信息质量检查**：对证据状态、来源矛盾、材料完整度、公司基线、资格商业门槛与敏感信息披露逐项记录 `PASS`/`FAIL`、证据、责任人和关闭动作，再确定交付状态。
 
 ## 降级处理

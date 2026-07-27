@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>虚构大学商机内部审查报告</title>
+  <style>
+    :root {
+      --canvas: #f5f3e9;
+      --surface: #ffffff;
+      --ink: #29271d;
+      --body: #403d36;
+      --muted: #6d675b;
+      --line: #d8d2c3;
+      --accent: #b7791f;
+      --teal: #2c6f75;
+      --danger: #7c1b13;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--body); font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; line-height: 1.72; }
+    .page { width: min(960px, calc(100% - 32px)); margin: 32px auto; overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: 0 18px 50px rgba(41,39,29,.09); }
+    header, main, footer { padding: 48px 56px; }
+    header { border-top: 6px solid var(--accent); border-bottom: 1px solid var(--line); }
+    .label { display: inline-block; padding: 4px 8px; border-radius: 6px; color: #8a5a12; background: #f0eee6; font: 600 11px ui-monospace, monospace; }
+    h1, h2 { color: var(--ink); letter-spacing: -.01em; }
+    h1 { margin: 24px 0 12px; font-size: clamp(36px, 7vw, 58px); line-height: 1.08; }
+    h2 { margin: 0 0 18px; font-size: 26px; }
+    p { max-width: 70ch; }
+    .decision { margin-top: 32px; padding: 28px; border-radius: 8px; color: #f8f7f2; background: #2a2b2a; }
+    .decision h2 { margin-bottom: 8px; color: #f8f7f2; }
+    .decision p { margin: 0; color: #bbb6a8; }
+    section { padding: 38px 0; border-bottom: 1px solid var(--line); }
+    section:last-child { border-bottom: 0; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #f8f7f2; }
+    .card strong { display: block; color: var(--ink); font-size: 20px; }
+    .callout { padding: 16px 18px; border-left: 3px solid var(--teal); background: #f4f8f7; }
+    .danger { border-left-color: var(--danger); background: #fbf3f2; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: #f8f7f2; }
+    footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+    @media (max-width: 640px) { .page { width: 100%; margin: 0; border-radius: 0; box-shadow: none; } header, main, footer { padding: 28px 22px; } .grid { grid-template-columns: 1fr; } }
+    @media print { body { background: #fff; } .page { width: auto; margin: 0; box-shadow: none; } }
+  </style>
+</head>
+<body data-report-visibility="internal">
+  <article class="page">
+    <header>
+      <span class="label">内部版 · 草稿</span>
+      <h1>虚构大学数字化建设项目</h1>
+      <p>商机参与决策、能力边界与投标风险审查。本页面使用虚构数据，只展示 HTML 输出形态。</p>
+      <div class="decision">
+        <h2>Insufficient Information</h2>
+        <p>公司能力基线、原厂授权、垫资边界和评审排序尚未关闭，当前不得形成 Go 结论。</p>
+      </div>
+    </header>
+    <main>
+      <section>
+        <h2>决策摘要</h2>
+        <div class="grid">
+          <div class="card">参与建议<strong>信息不足</strong></div>
+          <div class="card">关键失败门槛<strong>4 项</strong></div>
+        </div>
+      </section>
+      <section>
+        <h2>资格和废标风险</h2>
+        <div class="callout danger"><strong>原厂授权未核验。</strong>采购材料将其列为投标时硬性资格，不得假定中标后补正。</div>
+      </section>
+      <section>
+        <h2>质量门槛</h2>
+        <table>
+          <thead><tr><th>门槛</th><th>状态</th><th>影响</th><th>关闭动作</th></tr></thead>
+          <tbody>
+            <tr><td>公司基线</td><td>FAIL</td><td>能力、工作量和报价不能形成确定结论</td><td>由公司基线负责人更新并批准条目</td></tr>
+            <tr><td>披露</td><td>PASS</td><td>正式报告不得包含内部策略。</td><td>按披露白名单独立生成正式版</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+    <footer>生成状态：草稿，需人工复核。事实与证据以结构化分析对象和证据台账为准。</footer>
+  </article>
+</body>
+</html>

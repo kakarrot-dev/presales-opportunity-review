@@ -6,8 +6,8 @@
 
 给定招标文件、竞争性谈判材料、采购清单、技术需求、评分办法、预算/报价表或商机说明，按固定 19 阶段流程输出：
 
-- 内部直白版审查报告
-- 正式对外版报告（独立生成，不靠删减内部版）
+- 内部直白版审查报告（Markdown + 单文件 HTML）
+- 正式对外版报告（Markdown + 单文件 HTML，独立生成，不靠删减内部版）
 - 内部待确认清单 + 甲方正式澄清清单
 - 响应合规矩阵与证据台账
 - `project-analysis.yaml` 结构化分析对象
@@ -28,6 +28,7 @@ SKILL.md                 # 触发条件与 19 阶段编排（薄入口）
 knowledge/
   company-profile.md     # 公司能力/商务基线（可编辑，条目级可信度）
 references/              # 各阶段规则契约（一文件一决策边界）
+templates/               # Claude Cream 单文件 HTML 报告壳层
 examples/                # 虚构样例输入与期望输出形态
 tests/                   # 包结构与契约静态校验
 docs/superpowers/        # 设计规格与实现计划
@@ -52,6 +53,10 @@ docs/superpowers/        # 设计规格与实现计划
 | `05-response-compliance-matrix.md` | 响应合规矩阵 |
 | `06-evidence-register.md` | 证据台账 |
 | `project-analysis.yaml` | 统一分析对象 |
+| `01-opportunity-review-internal.html` | 内部报告可阅读、可打印版本 |
+| `02-opportunity-review-formal.html` | 正式报告可阅读、可打印版本 |
+
+HTML 使用 Claude Cream 的暖象牙、琥珀与暖炭色 token，单文件离线可打开，支持明暗主题、窄屏阅读与打印。正式 HTML 与正式 Markdown 一样从披露白名单独立生成，不能通过隐藏内部内容得到。
 
 ## 校验
 
@@ -67,7 +72,7 @@ python3 tests/check_skill_package.py .
 ## 样例
 
 - 输入约定：`examples/sample-input.md`（虚构大学场景，含冲突条款、循环转载、OCR/多格式定位）
-- 输出形态：`examples/sample-report.md`
+- 输出形态：`examples/sample-report.md`、`examples/sample-report.html`
 
 **不要**把真实客户招标原件提交进仓库。
 

@@ -319,7 +319,9 @@ outputs/<项目简称>-<日期>/
 ├── 04-clarification-customer.md
 ├── 05-response-compliance-matrix.md
 ├── 06-evidence-register.md
-└── project-analysis.yaml
+├── project-analysis.yaml
+├── 01-opportunity-review-internal.html
+└── 02-opportunity-review-formal.html
 ```
 
 ### 9.1 材料索引
@@ -335,6 +337,10 @@ outputs/<项目简称>-<日期>/
 包括项目理解、建设目标、需求和采购包分析、建议技术与实施边界、关键依赖、工作量和周期、风险及前置条件、正式澄清事项、服务与验收关注点、结论和后续建议。
 
 正式版根据允许披露的内容白名单独立生成，不采用从内部版删除敏感段落的方式。内部底价、能力短板、竞争策略和未经确认的推测不得出现。
+
+### 9.3.1 HTML 阅读与打印版本
+
+内部版和正式版各生成一份单文件 HTML。HTML 只负责展示已通过相应证据、质量门槛和披露检查的内容，不承担筛选或脱敏。两份 HTML 复用同一 Claude Cream 视觉壳层，但内容分别从内部报告输入和正式披露白名单独立组装。HTML 离线可打开，支持明暗主题、375px 单列阅读和打印样式，不加载外部字体、脚本、样式或图片。
 
 ### 9.4 响应合规矩阵
 

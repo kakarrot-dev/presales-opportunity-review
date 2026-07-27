@@ -459,6 +459,58 @@ strategy.recommendation: Conditional Go
             self.assertIn("report rules missing token: 05-response-compliance-matrix.md", errors)
             self.assertIn("report rules missing token: 白名单", errors)
 
+    def test_html_report_contract_rejects_missing_tokens_offline_and_disclosure_guards(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "templates" / "opportunity-review-report.html"
+            template.parent.mkdir(parents=True)
+            source = (source_root / "templates" / "opportunity-review-report.html").read_text(encoding="utf-8")
+            template.write_text(
+                source
+                .replace("--cc-canvas: #f5f3e9;", "--cc-canvas: #ffffff;", 1)
+                .replace("@media print", "@media screen", 1)
+                .replace("data-report-visibility=\"{{REPORT_VISIBILITY}}\"", "", 1)
+                .replace("window.print()", "void 0", 1)
+                .replace("font-family: var(--cc-font-body)", "font-family: Inter", 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("HTML template invalid Claude Cream token: --cc-canvas", errors)
+            self.assertIn("HTML template missing print stylesheet", errors)
+            self.assertIn("HTML template missing report visibility marker", errors)
+            self.assertIn("HTML template missing print action", errors)
+            self.assertIn("HTML template must use Claude Cream font stack", errors)
+
+    def test_html_report_contract_rejects_external_dependencies_and_sensitive_formal_content(self) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "templates" / "opportunity-review-report.html"
+            sample = root / "examples" / "sample-report.html"
+            template.parent.mkdir(parents=True)
+            sample.parent.mkdir(parents=True)
+            template.write_text(
+                (source_root / "templates" / "opportunity-review-report.html")
+                .read_text(encoding="utf-8")
+                .replace("</head>", '<link rel="stylesheet" href="https://example.invalid/report.css">\n</head>', 1),
+                encoding="utf-8",
+            )
+            sample.write_text(
+                (source_root / "examples" / "sample-report.html")
+                .read_text(encoding="utf-8")
+                .replace("data-report-visibility=\"internal\"", "data-report-visibility=\"formal\"", 1)
+                .replace("正式报告不得包含内部策略。", "正式报告包含内部底价。", 1),
+                encoding="utf-8",
+            )
+
+            errors = validate_package(root)
+
+            self.assertIn("HTML template must be self-contained", errors)
+            self.assertIn("sample formal HTML contains forbidden content: 内部底价", errors)
+
     def test_current_package_has_no_capability_definition_errors(self) -> None:
         root = Path(__file__).resolve().parents[1]
 
@@ -734,20 +786,31 @@ strategy.recommendation: Conditional Go
         source = (source_root / "knowledge" / "company-profile.md").read_text(
             encoding="utf-8"
         )
-        for field, line in (
-            ("更新时间", "- 更新时间：待维护\n"),
-            ("维护人", "- 维护人：待维护\n"),
-            ("可信度", "- 可信度：待核验\n"),
-        ):
+        for field in ("更新时间", "维护人", "可信度"):
             with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 profile = root / "knowledge" / "company-profile.md"
                 profile.parent.mkdir(parents=True)
+                line = next(
+                    candidate
+                    for candidate in source.splitlines(keepends=True)
+                    if candidate.startswith(f"- {field}：")
+                )
                 profile.write_text(source.replace(line, "", 1), encoding="utf-8")
 
                 errors = validate_package(root)
 
                 self.assertIn(f"company profile metadata missing field: {field}", errors)
+
+    def test_company_profile_contains_current_company_people_capacity_and_target(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+
+        errors = validate_package(root)
+
+        self.assertFalse(
+            [error for error in errors if error.startswith("company profile current baseline missing token:")],
+            errors,
+        )
 
     def test_capability_rules_require_entry_id_citation_and_expiry_fallback(self) -> None:
         source_root = Path(__file__).resolve().parents[1]
